@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeepSeek Glass</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <main id="root">
+      <p class="mark">DeepSeek Glass</p>
+      <h1>聊天窗口在原生壳里打开</h1>
+      <p>
+        正式界面是 <span>https://chat.deepseek.com/</span>，由 Tauri
+        窗口直接加载。这个本地页面只是打包进应用的最小前端，平时不会出现。
+      </p>
+      <p class="en">
+        The app window loads the official DeepSeek chat page. This local shell
+        is only here so the Tauri bundle has a frontend to compile.
+      </p>
+    </main>
+  </body>
+</html>

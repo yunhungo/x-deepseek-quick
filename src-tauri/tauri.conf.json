@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DeepSeek Glass",
+  "version": "0.1.0",
+  "identifier": "app.deepseekglass.launcher",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "DeepSeek Glass",
+        "create": false,
+        "url": "https://chat.deepseek.com/",
+        "width": 1120,
+        "height": 780,
+        "minWidth": 840,
+        "minHeight": 600,
+        "resizable": true,
+        "center": true,
+        "preventOverflow": true,
+        "transparent": true,
+        "decorations": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Transparent",
+        "acceptFirstMouse": true,
+        "shadow": true,
+        "dragDropEnabled": false,
+        "backgroundColor": "#00000000",
+        "windowEffects": {
+          "effects": ["hudWindow", "mica", "acrylic"],
+          "state": "active",
+          "radius": 12
+        }
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self'; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Frosted launcher for DeepSeek chat",
+    "longDescription": "A native window around the official DeepSeek web chat. macOS uses vibrancy; Linux uses a transparent window plus compositor blur. Includes a global show/hide shortcut.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  }
+}

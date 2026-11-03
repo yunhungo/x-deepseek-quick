@@ -1,0 +1,71 @@
+:root {
+  color: #e8eef2;
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(186, 230, 240, 0.28), transparent 55%),
+    linear-gradient(165deg, #12343c 0%, #071016 70%);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Songti SC", serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+}
+
+main {
+  width: min(640px, 100%);
+  padding: 36px 32px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+}
+
+.mark {
+  margin: 0 0 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 12px;
+  color: #b7e4ea;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+p {
+  margin: 0;
+  font-family: "Avenir Next", "PingFang SC", "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #d5dee3;
+}
+
+span {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  color: #f4fbff;
+}
+
+.en {
+  margin-top: 18px;
+  color: #9fb0b6;
+}

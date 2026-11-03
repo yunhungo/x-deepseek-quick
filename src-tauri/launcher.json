@@ -1,0 +1,14 @@
+{
+  "chatUrl": "https://chat.deepseek.com/",
+  "shortcut": "CommandOrControl+Shift+D",
+  "allowedHosts": ["chat.deepseek.com"],
+  "glass": {
+    "enabled": true,
+    "forceOnUnsupported": false,
+    "shellAlpha": 0.74,
+    "panelAlpha": 0.88,
+    "shellCoverage": 0.82,
+    "panelWidthCoverage": 0.28,
+    "panelHeightCoverage": 0.62
+  }
+}
