@@ -7,7 +7,7 @@ edition = "2024"
 
 [lib]
 name = "deepseek_glass_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -25,6 +25,9 @@ url = "2"
 gdkx11 = { version = "0.18", features = ["v3_24"] }
 gtk = { version = "0.18", features = ["v3_24"] }
 x11rb = "0.13"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
 
 [profile.release]
 codegen-units = 1

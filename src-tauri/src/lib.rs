@@ -1,3 +1,6 @@
+// @created 2026-11-03
+// @description 组装桌面窗口、磨砂材质与全局快捷键
+// @author yunhungo
 //! DeepSeek Glass — a native window around the public DeepSeek chat page.
 //!
 //! The webview loads `https://chat.deepseek.com/` (or the URL in launcher.json).
@@ -109,9 +112,15 @@ fn open_main(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::er
     }
 
     let prelude = settings.prelude_script();
+    let script_path = if cfg!(debug_assertions) {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scripts/glass.js")
+    } else {
+        app.path().resolve("scripts/glass.js", tauri::path::BaseDirectory::Resource)?
+    };
+    let glass_script = std::fs::read_to_string(script_path)?;
     let window = WebviewWindowBuilder::from_config(app, &window_cfg)?
         .initialization_script(prelude)
-        .initialization_script(include_str!("../scripts/glass.js"))
+        .initialization_script(glass_script)
         .on_navigation(navigation_allowed)
         .on_new_window(|url, _features| {
             if popup_allowed(&url) {
@@ -134,7 +143,10 @@ fn open_main(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::er
     linux_glass::apply(&window);
 
     #[cfg(target_os = "macos")]
-    hide_instead_of_close(&window);
+    {
+        configure_macos_window(&window)?;
+        hide_instead_of_close(&window);
+    }
     // Typecheck the macOS close path on other hosts. It is not installed there.
     #[cfg(not(target_os = "macos"))]
     let _ = hide_instead_of_close;
@@ -150,6 +162,27 @@ fn open_main(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::er
         }
     );
     let _ = window;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn configure_macos_window(window: &WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
+    use objc2::{msg_send, runtime::AnyObject};
+    // SAFETY: setup runs on the AppKit main thread and Tauri owns this NSWindow.
+    unsafe {
+        let native = window.ns_window()? as *mut AnyObject;
+        let content: *mut AnyObject = msg_send![native, contentView];
+        let _: () = msg_send![content, setWantsLayer: true];
+        let layer: *mut AnyObject = msg_send![content, layer];
+        let _: () = msg_send![layer, setCornerRadius: 20.0_f64];
+        let _: () = msg_send![layer, setMasksToBounds: true];
+        for button in 0_usize..3 {
+            let control: *mut AnyObject = msg_send![native, standardWindowButton: button];
+            if !control.is_null() {
+                let _: () = msg_send![control, setHidden: true];
+            }
+        }
+    }
     Ok(())
 }
 

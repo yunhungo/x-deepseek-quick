@@ -1,7 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The DeepSeek page is a remote origin and is not granted any Tauri commands. Window effects, the hotkey, and show/hide are handled in Rust.",
-  "windows": ["main"],
-  "permissions": []
+  "description": "Allow only native window dragging from the main DeepSeek webview.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:window:allow-start-dragging"
+  ],
+  "remote": {
+    "urls": [
+      "https://chat.deepseek.com/*"
+    ]
+  }
 }
