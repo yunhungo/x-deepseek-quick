@@ -37,3 +37,11 @@ test('unapproved origins never access or mutate the page', () => {
     location: { hostname: 'unapproved.example' },
   }));
 });
+
+test('verified top toolbar clears its bar without changing button geometry', () => {
+  const toolbar = { neutral: true, toolbar: true, widthRatio: 0.9, heightRatio: 0.06 };
+  assert.equal(classifySurface(toolbar), 'shell');
+  assert.equal(classifySurface({ ...toolbar, toolbar: false }), null);
+  assert.equal(classifySurface({ ...toolbar, protected: true }), null);
+  assert.equal(classifySurface({ ...toolbar, heightRatio: 0.5 }), null);
+});

@@ -19,6 +19,7 @@
   // Unknown structures stay untouched. Size alone never identifies a surface.
   function classifySurface(node) {
     if (node.protected || node.rounded || node.overlay || !node.neutral) return null;
+    if (node.toolbar && node.widthRatio >= 0.6 && node.heightRatio <= 0.15) return 'shell';
     if (node.layoutRoot && node.widthRatio >= 0.8 && node.heightRatio >= 0.8) return 'shell';
     if (node.edge && node.widthRatio >= 0.8 && node.heightRatio <= 0.4) return 'edge';
     return null;
@@ -82,8 +83,10 @@
 
     function neutral(color) {
       const match = /^rgba?\(([^)]+)\)$/.exec(color);
-      if (!match) return false;
-      const parts = match[1].split(/[\s,/]+/).map(Number);
+      const modern = /^color\(srgb\s+([^)]*)\)$/.exec(color);
+      if (!match && !modern) return false;
+      const parts = (match || modern)[1].split(/[\s,/]+/).map(Number);
+      if (modern) for (let i = 0; i < 3; i++) parts[i] *= 255;
       return parts.length >= 3 && (parts[3] ?? 1) >= 0.96 &&
         Math.max(...parts.slice(0, 3)) - Math.min(...parts.slice(0, 3)) < 24;
     }
@@ -122,6 +125,32 @@
           let ancestor = editor.parentElement;
           for (let depth = 0; ancestor && depth < 6; depth++, ancestor = ancestor.parentElement) candidates.add(ancestor);
         }
+        // A top toolbar may have a separately positioned share action. Clear
+        // only its painted bar; never resize or reposition website controls.
+        const toolbars = new Set();
+        for (const button of [...d.querySelectorAll('button, [role="button"]')].slice(0, 64)) {
+          const bounds = button.getBoundingClientRect();
+          if (bounds.top < 0 || bounds.bottom > 96) continue;
+          let ancestor = button.parentElement;
+          for (let depth = 0; ancestor && depth < 4; depth++, ancestor = ancestor.parentElement) {
+            const rect = ancestor.getBoundingClientRect();
+            if (rect.top > 24 || rect.height > 96 || rect.height < 24 || rect.width < w.innerWidth * 0.6) continue;
+            if (ancestor.querySelector('pre, textarea, [contenteditable]') ||
+              ancestor.querySelectorAll('button, [role="button"]').length < 2) continue;
+            toolbars.add(ancestor);
+            candidates.add(ancestor);
+          }
+        }
+        for (const hit of d.elementsFromPoint(w.innerWidth * 0.25, 24)) {
+          let ancestor = hit;
+          for (let depth = 0; ancestor && depth < 4; depth++, ancestor = ancestor.parentElement) {
+            const rect = ancestor.getBoundingClientRect();
+            if (rect.top > 24 || rect.height < 24 || rect.height > 96 || rect.width < w.innerWidth * 0.6) continue;
+            if (ancestor.querySelector('pre, textarea, [contenteditable]') || (ancestor.querySelectorAll('svg').length === 0 && !ancestor.parentElement?.querySelector('svg'))) continue;
+            toolbars.add(ancestor);
+            candidates.add(ancestor);
+          }
+        }
         for (const el of candidates) {
           const rect = el.getBoundingClientRect();
           const style = w.getComputedStyle(el);
@@ -133,8 +162,9 @@
           const kind = classifySurface({
             protected: Boolean(el.closest(POLICY.protectedSelector)),
             rounded: Number.parseFloat(style.borderTopLeftRadius) >= 8 || Number.parseFloat(style.borderBottomLeftRadius) >= 8,
-            overlay: fixed && Number.parseInt(style.zIndex, 10) > 1 && !semanticEdge && !composerFooter,
+            overlay: fixed && Number.parseInt(style.zIndex, 10) > 1 && !semanticEdge && !composerFooter && !toolbars.has(el),
             neutral: neutral(style.backgroundColor) || (edge && style.backgroundImage.includes('gradient')),
+            toolbar: toolbars.has(el),
             layoutRoot: !semanticEdge,
             edge,
             widthRatio: rect.width / w.innerWidth,
