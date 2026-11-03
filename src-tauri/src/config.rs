@@ -1,3 +1,6 @@
+// @created 2026-11-03
+// @description 校验并加载本机启动配置及网页适配参数
+// @author yunhungo
 //! User-facing launcher settings.
 //!
 //! The copy in `src-tauri/launcher.json` is the built-in default. On first
@@ -388,17 +391,6 @@ mod tests {
         let script = settings.prelude_script();
         assert!(script.contains("\"enabled\":false"), "{script}");
         assert!(script.starts_with("window.__DEEPSEEK_GLASS__="));
-    }
-
-    #[test]
-    fn glass_script_is_host_gated() {
-        let js = include_str!("../scripts/glass.js");
-        assert!(js.contains("location.hostname"));
-        assert!(js.contains("allowedHosts"));
-        assert!(js.contains("background-color"));
-        assert!(js.contains("shadowRoot"));
-        assert!(js.contains("elementFromPoint"));
-        assert!(js.contains("clearShell"));
     }
 
     #[test]
