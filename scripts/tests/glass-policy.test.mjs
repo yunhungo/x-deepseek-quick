@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const sandbox = { module: { exports: {} } };
 runInNewContext(readFileSync(new URL('../../src-tauri/scripts/glass.js', import.meta.url), 'utf8'), sandbox);
-const { classifySurface, install } = sandbox.module.exports;
+const { classifySurface, isComposerBacking, install } = sandbox.module.exports;
 const shell = { layoutRoot: true, neutral: true, widthRatio: 1, heightRatio: 1 };
 
 test('only a verified layout root can be cleared', () => {
@@ -44,4 +44,13 @@ test('verified top toolbar clears its bar without changing button geometry', () 
   assert.equal(classifySurface({ ...toolbar, toolbar: false }), null);
   assert.equal(classifySurface({ ...toolbar, protected: true }), null);
   assert.equal(classifySurface({ ...toolbar, heightRatio: 0.5 }), null);
+});
+
+test('composer backing is limited to the aligned card footprint', () => {
+  const frame = { top: 800, width: 600, height: 120 };
+  assert.equal(isComposerBacking(frame, { ...frame, height: 144 }), true);
+  assert.equal(isComposerBacking(frame, { ...frame, width: 700 }), false);
+  assert.equal(isComposerBacking(frame, { ...frame, top: 760 }), false);
+  assert.equal(isComposerBacking(frame, { ...frame, height: 300 }), false);
+  assert.equal(isComposerBacking(frame, { ...frame, height: 80 }), false);
 });

@@ -25,6 +25,11 @@
     return null;
   }
 
+  function isComposerBacking(frame, parent) {
+    return Math.abs(parent.top - frame.top) <= 2 && Math.abs(parent.width - frame.width) <= 8 &&
+      parent.height >= frame.height && parent.height <= frame.height + 64;
+  }
+
   function install(w) {
     const d = w.document;
     const cfg = w.__DEEPSEEK_GLASS__;
@@ -36,6 +41,7 @@
     let disposed = false;
     const marked = new Set();
     const codeFrames = new Set();
+    const composerBackings = new Set();
     const observation = { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style', 'data-theme'] };
 
     function start() {
@@ -49,6 +55,7 @@
         html[data-dsq-dark]{--dsq-tint:rgba(24,24,24,.18);--dsq-edge:rgba(30,30,30,.86);}
         html[data-dsq-glass] body,[data-dsq-surface="shell"]{background-color:transparent!important;background-image:none!important;}
         [data-dsq-surface="edge"]{background:var(--dsq-edge)!important;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);}
+        [data-dsq-composer-backing]{background-color:transparent!important;background-image:none!important;}
         [data-dsq-code-frame]{border-radius:12px!important;overflow:hidden!important;}
       `;
       (d.head || root).appendChild(style);
@@ -98,6 +105,8 @@
         marked.clear();
         for (const el of codeFrames) el.removeAttribute('data-dsq-code-frame');
         codeFrames.clear();
+        for (const el of composerBackings) el.removeAttribute('data-dsq-composer-backing');
+        composerBackings.clear();
         const root = d.documentElement;
         root.toggleAttribute('data-dsq-dark', root.classList.contains('dark') ||
           root.dataset.theme === 'dark' || d.body.classList.contains('dark') ||
@@ -175,6 +184,23 @@
             marked.add(el);
           }
         }
+        // Clear only the same-width backing behind the rounded composer.
+        // The editor card and the full-width readable footer remain intact.
+        for (const editor of d.querySelectorAll('textarea, [contenteditable], [role="textbox"]')) {
+          let frame = editor.parentElement;
+          for (let depth = 0; frame && depth < 6; depth++, frame = frame.parentElement) {
+            if (Number.parseFloat(w.getComputedStyle(frame).borderTopLeftRadius) < 8) continue;
+            const bounds = frame.getBoundingClientRect();
+            let parent = frame.parentElement;
+            for (let step = 0; parent && step < 2; step++, parent = parent.parentElement) {
+              const rect = parent.getBoundingClientRect();
+              if (!isComposerBacking(bounds, rect)) break;
+              parent.setAttribute('data-dsq-composer-backing', '');
+              composerBackings.add(parent);
+            }
+            break;
+          }
+        }
         // Clip the whole code card, not only its inner pre element.
         for (const pre of d.querySelectorAll('pre')) {
           let frame = pre;
@@ -192,6 +218,8 @@
         // Fail closed: restore website surfaces if its structure is unexpected.
         for (const el of marked) el.removeAttribute('data-dsq-surface');
         marked.clear();
+        for (const el of composerBackings) el.removeAttribute('data-dsq-composer-backing');
+        composerBackings.clear();
       } finally {
         if (!disposed) observer.observe(d.documentElement, observation);
       }
@@ -215,5 +243,5 @@
     else start();
   }
 
-  return { POLICY, classifySurface, install };
+  return { POLICY, classifySurface, isComposerBacking, install };
 });
