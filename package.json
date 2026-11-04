@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test:adapter": "node --test scripts/tests/glass-policy.test.mjs"
+    "test:adapter": "node --test scripts/tests/glass-policy.test.mjs",
+    "package:mac": "tauri bundle --bundles app && python3 -B scripts/package-macos.py"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

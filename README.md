@@ -57,3 +57,7 @@ WebView 明确关闭无痕模式，使用系统持久化网站数据存储。Coo
 正式源图为 `src-tauri/icons/source.png`，是按用户参考生成的蓝发 Q 版头像，不代表 DeepSeek 官方应用。运行 `python3 -B scripts/render-icon.py` 根据源图重新生成平台图标；仅保留当前目标需要的正式资源，清理未使用的生成目录。
 
 `.myself/` 用于被忽略的本机任务文件；不提交临时截图、测试报告、凭据或构建包。正式应用与可复用构建缓存保留在现有工具输出目录。
+
+## macOS 正式安装包
+
+完成原生 release 构建后运行 `npm run package:mac`：先打包当前网页资源，再补全 APP 签名、生成包含应用与 Applications 入口的 DMG，并只读挂载验证签名和适配器内容。默认使用本机 ad-hoc 签名；如配置 `APPLE_SIGNING_IDENTITY` 则沿用该身份。此流程不代表完成 Apple 公证。临时安装目录与挂载自动清理，正式 APP 和 DMG 留在既有 bundle 输出目录。
