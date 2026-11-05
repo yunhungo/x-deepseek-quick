@@ -30,6 +30,16 @@
       parent.height >= frame.height && parent.height <= frame.height + 64;
   }
 
+  function isComposerDecoration(style, frame) {
+    return ['', '""', '\'\''].includes(style.content) &&
+      ['absolute', 'fixed'].includes(style.position) && style.pointerEvents === 'none' &&
+      Number.parseFloat(style.width) >= frame.width * 0.8 &&
+      Number.parseFloat(style.width) <= frame.width + 80 &&
+      Number.parseFloat(style.height) > 0 && Number.parseFloat(style.height) <= frame.height + 64 &&
+      (style.backgroundImage.includes('gradient') || style.filter.includes('blur(') ||
+        (style.backdropFilter || style.webkitBackdropFilter || '').includes('blur('));
+  }
+
   function install(w) {
     const d = w.document;
     const cfg = w.__DEEPSEEK_GLASS__;
@@ -42,6 +52,7 @@
     const marked = new Set();
     const codeFrames = new Set();
     const composerBackings = new Set();
+    const composerDecorations = new Map();
     const observation = { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style', 'data-theme'] };
 
     function start() {
@@ -54,8 +65,9 @@
         html[data-dsq-glass]{--dsq-tint:rgba(255,255,255,.14);--dsq-edge:rgba(242,242,242,.86);background:var(--dsq-tint)!important;border-radius:20px;overflow:hidden;}
         html[data-dsq-dark]{--dsq-tint:rgba(24,24,24,.18);--dsq-edge:rgba(30,30,30,.86);}
         html[data-dsq-glass] body,[data-dsq-surface="shell"]{background-color:transparent!important;background-image:none!important;}
-        [data-dsq-surface="edge"]{background:var(--dsq-edge)!important;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);}
-        [data-dsq-composer-backing]{background-color:transparent!important;background-image:none!important;}
+        [data-dsq-surface="edge"]{background:var(--dsq-edge)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+        [data-dsq-composer-backing]{background-color:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+        [data-dsq-composer-decoration],[data-dsq-composer-before]::before,[data-dsq-composer-after]::after{background:transparent!important;box-shadow:none!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
         [data-dsq-code-frame]{border-radius:12px!important;overflow:hidden!important;}
       `;
       (d.head || root).appendChild(style);
@@ -107,6 +119,8 @@
         codeFrames.clear();
         for (const el of composerBackings) el.removeAttribute('data-dsq-composer-backing');
         composerBackings.clear();
+        for (const [el, attrs] of composerDecorations) for (const attr of attrs) el.removeAttribute(attr);
+        composerDecorations.clear();
         const root = d.documentElement;
         root.toggleAttribute('data-dsq-dark', root.classList.contains('dark') ||
           root.dataset.theme === 'dark' || d.body.classList.contains('dark') ||
@@ -191,6 +205,42 @@
           for (let depth = 0; frame && depth < 6; depth++, frame = frame.parentElement) {
             if (Number.parseFloat(w.getComputedStyle(frame).borderTopLeftRadius) < 8) continue;
             const bounds = frame.getBoundingClientRect();
+            // Website fades use empty elements or pseudo-elements beside the card.
+            // Match their behavior and geometry rather than generated class names.
+            let host = frame;
+            for (let step = 0; host && step < 6 && host !== d.body; step++, host = host.parentElement) {
+              const hostBounds = host.getBoundingClientRect();
+              if (hostBounds.height > bounds.height + 64 || Math.abs(hostBounds.top - bounds.top) > 40) break;
+              for (const child of [...host.children].slice(0, POLICY.maxNodes)) {
+                if (child === frame || child.children.length || !child.matches('div, span') || child.textContent.trim() ||
+                  child.matches(POLICY.protectedSelector + ', a, [role], [tabindex]')) continue;
+                const rect = child.getBoundingClientRect();
+                if (Math.abs(rect.bottom - bounds.top) > 80 && Math.abs(rect.top - bounds.top) > 40) continue;
+                const paint = w.getComputedStyle(child);
+                if (!isComposerDecoration({
+                  content: '',
+                  position: paint.position,
+                  pointerEvents: paint.pointerEvents,
+                  width: `${rect.width}px`,
+                  height: `${rect.height}px`,
+                  backgroundImage: paint.backgroundImage,
+                  filter: paint.filter,
+                  backdropFilter: paint.backdropFilter,
+                  webkitBackdropFilter: paint.webkitBackdropFilter,
+                }, bounds)) continue;
+                const attr = 'data-dsq-composer-decoration';
+                child.setAttribute(attr, '');
+                composerDecorations.set(child, [attr]);
+              }
+              for (const pseudo of ['before', 'after']) {
+                if (!isComposerDecoration(w.getComputedStyle(host, `::${pseudo}`), bounds)) continue;
+                const attr = `data-dsq-composer-${pseudo}`;
+                host.setAttribute(attr, '');
+                const attrs = composerDecorations.get(host) || [];
+                attrs.push(attr);
+                composerDecorations.set(host, attrs);
+              }
+            }
             let parent = frame.parentElement;
             for (let step = 0; parent && step < 2; step++, parent = parent.parentElement) {
               const rect = parent.getBoundingClientRect();
@@ -220,6 +270,8 @@
         marked.clear();
         for (const el of composerBackings) el.removeAttribute('data-dsq-composer-backing');
         composerBackings.clear();
+        for (const [el, attrs] of composerDecorations) for (const attr of attrs) el.removeAttribute(attr);
+        composerDecorations.clear();
       } finally {
         if (!disposed) observer.observe(d.documentElement, observation);
       }
@@ -243,5 +295,5 @@
     else start();
   }
 
-  return { POLICY, classifySurface, isComposerBacking, install };
+  return { POLICY, classifySurface, isComposerBacking, isComposerDecoration, install };
 });

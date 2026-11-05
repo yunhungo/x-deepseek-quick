@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const sandbox = { module: { exports: {} } };
 runInNewContext(readFileSync(new URL('../../src-tauri/scripts/glass.js', import.meta.url), 'utf8'), sandbox);
-const { classifySurface, isComposerBacking, install } = sandbox.module.exports;
+const { classifySurface, isComposerBacking, isComposerDecoration, install } = sandbox.module.exports;
 const shell = { layoutRoot: true, neutral: true, widthRatio: 1, heightRatio: 1 };
 
 test('only a verified layout root can be cleared', () => {
@@ -53,4 +53,17 @@ test('composer backing is limited to the aligned card footprint', () => {
   assert.equal(isComposerBacking(frame, { ...frame, top: 760 }), false);
   assert.equal(isComposerBacking(frame, { ...frame, height: 300 }), false);
   assert.equal(isComposerBacking(frame, { ...frame, height: 80 }), false);
+});
+
+test('only empty noninteractive composer fades are removed across widths', () => {
+  for (const width of [360, 600, 1100]) {
+    const fade = { content: '\'\'', position: 'absolute', pointerEvents: 'none',
+      width: `${width}px`, height: '152px', backgroundImage: 'linear-gradient(white, transparent)', filter: 'none' };
+    assert.equal(isComposerDecoration(fade, { width, height: 124 }), true);
+    for (const change of [{ content: '"help"' }, { pointerEvents: 'auto' },
+      { position: 'static' }, { height: '300px' }, { width: '20px' },
+      { backgroundImage: 'none' }]) {
+      assert.equal(isComposerDecoration({ ...fade, ...change }, { width, height: 124 }), false);
+    }
+  }
 });
