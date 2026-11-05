@@ -40,6 +40,33 @@
         (style.backdropFilter || style.webkitBackdropFilter || '').includes('blur('));
   }
 
+  // Keep layout/style work out of native scroll and momentum frames.
+  function createRefreshScheduler(w, refresh) {
+    let timer;
+    let disposed = false;
+    let lastScroll = -Infinity;
+    function run() {
+      timer = undefined;
+      if (disposed) return;
+      const remaining = 160 - (w.performance.now() - lastScroll);
+      if (remaining > 0) timer = w.setTimeout(run, remaining);
+      else refresh();
+    }
+    return {
+      schedule() {
+        if (!disposed && timer === undefined) timer = w.setTimeout(run, 200);
+      },
+      onScroll() {
+        lastScroll = w.performance.now();
+      },
+      dispose() {
+        disposed = true;
+        w.clearTimeout(timer);
+        timer = undefined;
+      },
+    };
+  }
+
   function install(w) {
     const d = w.document;
     const cfg = w.__DEEPSEEK_GLASS__;
@@ -47,8 +74,9 @@
     const hosts = new Set((cfg.allowedHosts || []).map((host) => String(host).toLowerCase()));
     if (!hosts.has(w.location.hostname)) return;
     let observer;
-    let timer;
     let disposed = false;
+    const scheduler = createRefreshScheduler(w, refresh);
+    const layoutNodes = new Set();
     const marked = new Set();
     const codeFrames = new Set();
     const composerBackings = new Set();
@@ -72,6 +100,7 @@
       `;
       (d.head || root).appendChild(style);
       d.addEventListener('mousedown', drag, { capture: true });
+      d.addEventListener('scroll', scheduler.onScroll, { capture: true, passive: true });
       observer = new w.MutationObserver(schedule);
       observer.observe(root, observation);
       w.addEventListener('resize', schedule, { passive: true });
@@ -92,12 +121,11 @@
       invoke('plugin:window|start_dragging', { label: 'main' }).catch(() => {});
     }
 
-    function schedule() {
-      if (disposed || timer || cfg.enabled !== true) return;
-      timer = w.setTimeout(() => {
-        timer = undefined;
-        refresh();
-      }, 200);
+    function schedule(records) {
+      if (disposed || cfg.enabled !== true) return;
+      if (Array.isArray(records) && !records.some((record) => record.type === 'childList' ||
+        record.target === d.documentElement || record.target === d.body || layoutNodes.has(record.target))) return;
+      scheduler.schedule();
     }
 
     function neutral(color) {
@@ -113,6 +141,7 @@
     function refresh() {
       observer.disconnect();
       try {
+        layoutNodes.clear();
         for (const el of marked) el.removeAttribute('data-dsq-surface');
         marked.clear();
         for (const el of codeFrames) el.removeAttribute('data-dsq-code-frame');
@@ -178,6 +207,7 @@
           }
         }
         for (const el of candidates) {
+          layoutNodes.add(el);
           const rect = el.getBoundingClientRect();
           const style = w.getComputedStyle(el);
           const fixed = ['fixed', 'sticky'].includes(style.position);
@@ -293,8 +323,9 @@
     function dispose() {
       disposed = true;
       observer?.disconnect();
-      w.clearTimeout(timer);
+      scheduler.dispose();
       d.removeEventListener('mousedown', drag, { capture: true });
+      d.removeEventListener('scroll', scheduler.onScroll, { capture: true });
       w.removeEventListener('resize', schedule);
       w.removeEventListener('pagehide', onPageHide);
       w.removeEventListener('pageshow', schedule);
@@ -304,5 +335,5 @@
     else start();
   }
 
-  return { POLICY, classifySurface, isComposerBacking, isComposerDecoration, install };
+  return { POLICY, classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, install };
 });

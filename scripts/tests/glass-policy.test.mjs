@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const sandbox = { module: { exports: {} } };
 runInNewContext(readFileSync(new URL('../../src-tauri/scripts/glass.js', import.meta.url), 'utf8'), sandbox);
-const { classifySurface, isComposerBacking, isComposerDecoration, install } = sandbox.module.exports;
+const { classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, install } = sandbox.module.exports;
 const shell = { layoutRoot: true, neutral: true, widthRatio: 1, heightRatio: 1 };
 
 test('only a verified layout root can be cleared', () => {
@@ -66,4 +66,35 @@ test('only empty noninteractive composer fades are removed across widths', () =>
       assert.equal(isComposerDecoration({ ...fade, ...change }, { width, height: 124 }), false);
     }
   }
+});
+
+test('adaptation waits until native momentum scrolling is quiet and cancels on disposal', () => {
+  let now = 0;
+  let id = 0;
+  const jobs = new Map();
+  const clock = {
+    performance: { now: () => now },
+    setTimeout(fn, delay) { jobs.set(++id, { at: now + delay, fn }); return id; },
+    clearTimeout(key) { jobs.delete(key); },
+  };
+  function advance(to) {
+    while (true) {
+      const next = [...jobs].sort((a, b) => a[1].at - b[1].at)[0];
+      if (!next || next[1].at > to) break;
+      now = next[1].at; jobs.delete(next[0]); next[1].fn();
+    }
+    now = to;
+  }
+  let refreshes = 0;
+  const scheduler = createRefreshScheduler(clock, () => refreshes++);
+  scheduler.schedule();
+  for (const time of [100, 200, 300, 400, 500]) {
+    advance(time); scheduler.onScroll(); scheduler.schedule();
+    assert.equal(refreshes, 0);
+  }
+  advance(659); assert.equal(refreshes, 0);
+  advance(660); assert.equal(refreshes, 1);
+  scheduler.schedule(); scheduler.dispose(); advance(1000);
+  assert.equal(refreshes, 1);
+  assert.equal(jobs.size, 0);
 });

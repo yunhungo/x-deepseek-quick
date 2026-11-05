@@ -46,7 +46,8 @@
           "x": 14,
           "y": 18
         },
-        "incognito": false
+        "incognito": false,
+        "backgroundThrottling": "disabled"
       }
     ],
     "security": {
