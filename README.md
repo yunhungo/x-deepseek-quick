@@ -19,6 +19,10 @@ macOS 成果为 `src-tauri/target/release/bundle/macos/DSQuick.app`。其他系�
 
 macOS 隐藏原生标题栏与交通灯，顶部空白可拖动；按钮和输入控件优先接收点击。整个窗口采用 20px 圆角，最小尺寸为 420 × 480。窗口大小和位置自动保存。
 
+## 输入法兼容
+
+macOS 通过公开的 `WKWebViewConfiguration.applicationNameForUserAgent` 追加 `DSQuick/<版本> Safari` 兼容标识，保留 WebKit 自动生成的系统和引擎信息。官网按 `Safari` 标识启用已有的组合输入处理；默认 WKWebView 标识缺少该字样，会导致确认拼音为英文的回车被当作发送。应用不监听或拦截键盘/组合输入事件，不改官网发送逻辑，也不硬编码 Safari 版本。更新时用真实中文输入法检查回车确认英文、空格确认中文、正常回车发送及 Shift+回车换行。
+
 ## 磨砂和网站适配
 
 原生窗口负责桌面背景模糊、透明、圆角和快捷键；网站适配器仅负责网页表面。macOS 使用原生 `NSVisualEffectView` 模糊窗口背后的画面，移除全窗口白/灰网页底色。`src-tauri/src/macos_glass.rs` 只在自身材质层中识别到背景模糊后，清除额外染色与饱和度增强；层级或滤镜无法识别时保留系统材质。内部图层不是公开稳定合同，系统升级后可能退回带调色的毛玻璃。不会修改 WebKit 图层，也不硬链接非公开窗口接口。输入框、代码卡片及页脚仍保留阅读所需的表面与阴影。Windows 使用 Mica/Acrylic，Linux 由桌面合成器提供模糊。GNOME 等没有窗口背景模糊能力的合成器只能显示透明效果。

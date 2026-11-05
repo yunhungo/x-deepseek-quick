@@ -122,7 +122,25 @@ fn open_main(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::er
             .resolve("scripts/glass.js", tauri::path::BaseDirectory::Resource)?
     };
     let glass_script = std::fs::read_to_string(script_path)?;
-    let window = WebviewWindowBuilder::from_config(app, &window_cfg)?
+    let window_builder = WebviewWindowBuilder::from_config(app, &window_cfg)?;
+    #[cfg(target_os = "macos")]
+    let window_builder = {
+        use objc2::MainThreadMarker;
+        use objc2_foundation::NSString;
+        use objc2_web_kit::WKWebViewConfiguration;
+
+        let main_thread =
+            MainThreadMarker::new().ok_or("webview must be created on the main thread")?;
+        // DeepSeek enables its existing WebKit IME handling only for a Safari
+        // user-agent token. Preserve WebKit's actual OS/engine identity instead
+        // of replacing the UA or intercepting composition/keyboard events.
+        let configuration = unsafe { WKWebViewConfiguration::new(main_thread) };
+        let application_name =
+            NSString::from_str(concat!("DSQuick/", env!("CARGO_PKG_VERSION"), " Safari"));
+        unsafe { configuration.setApplicationNameForUserAgent(Some(&application_name)) };
+        window_builder.with_webview_configuration(configuration)
+    };
+    let window = window_builder
         .initialization_script(prelude)
         .initialization_script(glass_script)
         .on_navigation(navigation_allowed)
