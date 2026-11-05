@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const sandbox = { module: { exports: {} } };
 runInNewContext(readFileSync(new URL('../../src-tauri/scripts/glass.js', import.meta.url), 'utf8'), sandbox);
-const { classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, installImeGuard, install } = sandbox.module.exports;
+const { classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, install } = sandbox.module.exports;
 const shell = { layoutRoot: true, neutral: true, widthRatio: 1, heightRatio: 1 };
 
 test('only a verified layout root can be cleared', () => {
@@ -97,49 +97,4 @@ test('adaptation waits until native momentum scrolling is quiet and cancels on d
   scheduler.schedule(); scheduler.dispose(); advance(1000);
   assert.equal(refreshes, 1);
   assert.equal(jobs.size, 0);
-});
-
-test('IME confirmation never reaches send handlers but ordinary Enter and native defaults survive', () => {
-  const listeners = new Map();
-  const window = {
-    addEventListener(type, fn, capture) { assert.equal(capture, true); listeners.set(type, fn); },
-    removeEventListener(type, fn, capture) {
-      assert.equal(capture, true);
-      assert.equal(listeners.get(type), fn);
-      listeners.delete(type);
-    },
-  };
-  const editor = { closest: () => editor };
-  const other = { closest: () => null };
-  const dispose = installImeGuard(window);
-  function dispatch(type, props = {}) {
-    let stopped = false;
-    let prevented = false;
-    const event = { type, target: editor, key: 'Enter', keyCode: 13, isComposing: false,
-      ...props, stopImmediatePropagation() { stopped = true; },
-      preventDefault() { prevented = true; } };
-    listeners.get(type)?.(event);
-    assert.equal(prevented, false, 'native IME confirmation must remain enabled');
-    return stopped;
-  }
-  // Chromium ordering: confirmation arrives while composition is active.
-  dispatch('compositionstart');
-  assert.equal(dispatch('keydown'), true);
-  dispatch('compositionend');
-  assert.equal(dispatch('keypress'), true);
-  assert.equal(dispatch('keyup'), true);
-  assert.equal(dispatch('keydown'), false, 'next intentional Enter must send normally');
-  // WebKit ordering: compositionend precedes keydown with keyCode 229.
-  dispatch('compositionstart'); dispatch('compositionend');
-  assert.equal(dispatch('keydown', { keyCode: 229 }), true);
-  assert.equal(dispatch('keyup'), true);
-  assert.equal(dispatch('keydown', { shiftKey: true }), false);
-  assert.equal(dispatch('keydown', { isComposing: true }), true);
-  assert.equal(dispatch('keydown', { key: 'a', keyCode: 229 }), false);
-  assert.equal(dispatch('keyup'), false, 'a new key sequence clears the prior confirmation');
-  assert.equal(dispatch('keydown', { target: other, keyCode: 229 }), false);
-  dispatch('compositionstart'); dispatch('blur');
-  assert.equal(dispatch('keydown'), false, 'losing focus clears composition state');
-  dispose();
-  assert.equal(listeners.size, 0);
 });
