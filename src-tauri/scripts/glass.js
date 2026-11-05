@@ -67,7 +67,7 @@
         html[data-dsq-glass] body,[data-dsq-surface="shell"]{background-color:transparent!important;background-image:none!important;}
         [data-dsq-surface="edge"]{background:var(--dsq-edge)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
         [data-dsq-composer-backing]{background-color:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
-        [data-dsq-composer-decoration],[data-dsq-composer-before]::before,[data-dsq-composer-after]::after{background:transparent!important;box-shadow:none!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+        [data-dsq-composer-decoration],[data-dsq-composer-before]::before,[data-dsq-composer-after]::after{mask-image:linear-gradient(to bottom,transparent calc(var(--dsq-composer-bottom) - 40px),#000 calc(var(--dsq-composer-bottom) - 4px))!important;-webkit-mask-image:linear-gradient(to bottom,transparent calc(var(--dsq-composer-bottom) - 40px),#000 calc(var(--dsq-composer-bottom) - 4px))!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
         [data-dsq-code-frame]{border-radius:12px!important;overflow:hidden!important;}
       `;
       (d.head || root).appendChild(style);
@@ -119,7 +119,10 @@
         codeFrames.clear();
         for (const el of composerBackings) el.removeAttribute('data-dsq-composer-backing');
         composerBackings.clear();
-        for (const [el, attrs] of composerDecorations) for (const attr of attrs) el.removeAttribute(attr);
+        for (const [el, attrs] of composerDecorations) {
+          for (const attr of attrs) el.removeAttribute(attr);
+          el.style.removeProperty('--dsq-composer-bottom');
+        }
         composerDecorations.clear();
         const root = d.documentElement;
         root.toggleAttribute('data-dsq-dark', root.classList.contains('dark') ||
@@ -206,7 +209,8 @@
             if (Number.parseFloat(w.getComputedStyle(frame).borderTopLeftRadius) < 8) continue;
             const bounds = frame.getBoundingClientRect();
             // Website fades use empty elements or pseudo-elements beside the card.
-            // Match their behavior and geometry rather than generated class names.
+            // Keep the original lower fade for the card shadow; mask only the upper
+            // decoration. Geometry follows the editor as it grows or resizes.
             let host = frame;
             for (let step = 0; host && step < 6 && host !== d.body; step++, host = host.parentElement) {
               const hostBounds = host.getBoundingClientRect();
@@ -230,12 +234,14 @@
                 }, bounds)) continue;
                 const attr = 'data-dsq-composer-decoration';
                 child.setAttribute(attr, '');
+                child.style.setProperty('--dsq-composer-bottom', `${bounds.bottom - rect.top}px`);
                 composerDecorations.set(child, [attr]);
               }
               for (const pseudo of ['before', 'after']) {
                 if (!isComposerDecoration(w.getComputedStyle(host, `::${pseudo}`), bounds)) continue;
                 const attr = `data-dsq-composer-${pseudo}`;
                 host.setAttribute(attr, '');
+                host.style.setProperty('--dsq-composer-bottom', `${bounds.bottom - hostBounds.top}px`);
                 const attrs = composerDecorations.get(host) || [];
                 attrs.push(attr);
                 composerDecorations.set(host, attrs);
@@ -270,7 +276,10 @@
         marked.clear();
         for (const el of composerBackings) el.removeAttribute('data-dsq-composer-backing');
         composerBackings.clear();
-        for (const [el, attrs] of composerDecorations) for (const attr of attrs) el.removeAttribute(attr);
+        for (const [el, attrs] of composerDecorations) {
+          for (const attr of attrs) el.removeAttribute(attr);
+          el.style.removeProperty('--dsq-composer-bottom');
+        }
         composerDecorations.clear();
       } finally {
         if (!disposed) observer.observe(d.documentElement, observation);
