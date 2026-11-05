@@ -62,8 +62,8 @@
       const style = d.createElement('style');
       style.id = 'dsquick-adapter';
       style.textContent = `
-        html[data-dsq-glass]{--dsq-tint:rgba(255,255,255,.14);--dsq-edge:rgba(242,242,242,.86);background:var(--dsq-tint)!important;border-radius:20px;overflow:hidden;}
-        html[data-dsq-dark]{--dsq-tint:rgba(24,24,24,.18);--dsq-edge:rgba(30,30,30,.86);}
+        html[data-dsq-glass]{--dsq-edge:rgba(242,242,242,.86);background:transparent!important;border-radius:20px;overflow:hidden;}
+        html[data-dsq-dark]{--dsq-edge:rgba(30,30,30,.86);}
         html[data-dsq-glass] body,[data-dsq-surface="shell"]{background-color:transparent!important;background-image:none!important;}
         [data-dsq-surface="edge"]{background:var(--dsq-edge)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
         [data-dsq-composer-backing]{background-color:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}

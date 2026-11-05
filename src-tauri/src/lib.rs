@@ -13,6 +13,9 @@ mod config;
 #[cfg(target_os = "linux")]
 mod linux_glass;
 
+#[cfg(target_os = "macos")]
+mod macos_glass;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use config::Settings;
@@ -115,7 +118,8 @@ fn open_main(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::er
     let script_path = if cfg!(debug_assertions) {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scripts/glass.js")
     } else {
-        app.path().resolve("scripts/glass.js", tauri::path::BaseDirectory::Resource)?
+        app.path()
+            .resolve("scripts/glass.js", tauri::path::BaseDirectory::Resource)?
     };
     let glass_script = std::fs::read_to_string(script_path)?;
     let window = WebviewWindowBuilder::from_config(app, &window_cfg)?
@@ -145,6 +149,9 @@ fn open_main(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::er
     #[cfg(target_os = "macos")]
     {
         configure_macos_window(&window)?;
+        if settings.glass_applies() {
+            macos_glass::apply(&window)?;
+        }
         hide_instead_of_close(&window);
     }
     // Typecheck the macOS close path on other hosts. It is not installed there.
