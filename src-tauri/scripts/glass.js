@@ -67,12 +67,59 @@
     };
   }
 
+  // WebKit may end composition before dispatching its confirming Enter.
+  // keyCode 229 still identifies that IME key even when isComposing is false.
+  function installImeGuard(w) {
+    let composingTarget = null;
+    let confirmingTarget = null;
+    function editor(target) {
+      return target?.closest?.('textarea, [contenteditable="true"], [contenteditable=""], [role="textbox"]');
+    }
+    function compositionStart(event) {
+      composingTarget = editor(event.target);
+    }
+    function compositionEnd() {
+      composingTarget = null;
+    }
+    function reset() {
+      composingTarget = null;
+      confirmingTarget = null;
+    }
+    function keydown(event) {
+      confirmingTarget = null;
+      const target = editor(event.target);
+      if (!target || event.key !== 'Enter') return;
+      if (event.isComposing || event.keyCode === 229 || target === composingTarget) {
+        confirmingTarget = target;
+        // Preserve native IME default behavior; only hide this key from site handlers.
+        event.stopImmediatePropagation();
+      }
+    }
+    function trailingKey(event) {
+      const target = editor(event.target);
+      if (target && target === confirmingTarget && event.key === 'Enter') {
+        event.stopImmediatePropagation();
+        if (event.type === 'keyup') confirmingTarget = null;
+      }
+    }
+    const listeners = [
+      ['compositionstart', compositionStart], ['compositionend', compositionEnd],
+      ['keydown', keydown], ['keypress', trailingKey], ['keyup', trailingKey], ['blur', reset],
+    ];
+    for (const [type, listener] of listeners) w.addEventListener(type, listener, true);
+    return () => {
+      for (const [type, listener] of listeners) w.removeEventListener(type, listener, true);
+      reset();
+    };
+  }
+
   function install(w) {
     const d = w.document;
     const cfg = w.__DEEPSEEK_GLASS__;
     if (!cfg) return;
     const hosts = new Set((cfg.allowedHosts || []).map((host) => String(host).toLowerCase()));
     if (!hosts.has(w.location.hostname)) return;
+    const disposeImeGuard = installImeGuard(w);
     let observer;
     let disposed = false;
     const scheduler = createRefreshScheduler(w, refresh);
@@ -324,6 +371,7 @@
       disposed = true;
       observer?.disconnect();
       scheduler.dispose();
+      disposeImeGuard();
       d.removeEventListener('mousedown', drag, { capture: true });
       d.removeEventListener('scroll', scheduler.onScroll, { capture: true });
       w.removeEventListener('resize', schedule);
@@ -335,5 +383,5 @@
     else start();
   }
 
-  return { POLICY, classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, install };
+  return { POLICY, classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, installImeGuard, install };
 });
