@@ -34,7 +34,7 @@
     return ['', '""', '\'\''].includes(style.content) &&
       ['absolute', 'fixed'].includes(style.position) && style.pointerEvents === 'none' &&
       Number.parseFloat(style.width) >= frame.width * 0.8 &&
-      Number.parseFloat(style.width) <= frame.width + 80 &&
+      Number.parseFloat(style.width) <= Math.max(frame.width + 80, frame.viewportWidth || 0) &&
       Number.parseFloat(style.height) > 0 && Number.parseFloat(style.height) <= frame.height + 64 &&
       (style.backgroundImage.includes('gradient') || style.filter.includes('blur(') ||
         (style.backdropFilter || style.webkitBackdropFilter || '').includes('blur('));
@@ -106,12 +106,12 @@
       const style = d.createElement('style');
       style.id = 'dsquick-adapter';
       style.textContent = `
-        html[data-dsq-glass]{--dsq-backdrop-tint:rgba(255,255,255,.42);--dsq-edge:rgba(242,242,242,.86);background:var(--dsq-backdrop-tint)!important;border-radius:20px;overflow:hidden;}
-        html[data-dsq-glass][data-dsq-dark]{--dsq-backdrop-tint:rgba(0,0,0,.68);--dsq-edge:rgba(30,30,30,.86);}
+        html[data-dsq-glass]{--dsq-backdrop-tint:rgba(255,255,255,.42);--dsq-edge:transparent;background:var(--dsq-backdrop-tint)!important;border-radius:20px;overflow:hidden;}
+        html[data-dsq-glass][data-dsq-dark]{--dsq-backdrop-tint:rgba(0,0,0,.68);--dsq-edge:transparent;}
         html[data-dsq-glass] body,[data-dsq-surface="shell"]{background-color:transparent!important;background-image:none!important;}
         [data-dsq-surface="edge"]{background:var(--dsq-edge)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
         [data-dsq-composer-backing]{background-color:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
-        [data-dsq-composer-decoration],[data-dsq-composer-before]::before,[data-dsq-composer-after]::after{mask-image:linear-gradient(to bottom,transparent calc(var(--dsq-composer-bottom) - 40px),#000 calc(var(--dsq-composer-bottom) - 4px))!important;-webkit-mask-image:linear-gradient(to bottom,transparent calc(var(--dsq-composer-bottom) - 40px),#000 calc(var(--dsq-composer-bottom) - 4px))!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+        [data-dsq-composer-decoration],[data-dsq-composer-before]::before,[data-dsq-composer-after]::after{background:transparent!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important;}
         [data-dsq-code-frame]{border-radius:12px!important;overflow:hidden!important;}
       `;
       (d.head || root).appendChild(style);
@@ -166,7 +166,6 @@
         composerBackings.clear();
         for (const [el, attrs] of composerDecorations) {
           for (const attr of attrs) el.removeAttribute(attr);
-          el.style.removeProperty('--dsq-composer-bottom');
         }
         composerDecorations.clear();
         const root = d.documentElement;
@@ -243,8 +242,26 @@
             heightRatio: rect.height / w.innerHeight,
           });
           if (kind) {
-            el.setAttribute('data-dsq-surface', kind);
+            el.setAttribute('data-dsq-surface', composerFooter ? 'shell' : kind);
             marked.add(el);
+          }
+        }
+        // The disclaimer may be a plain div rather than a semantic footer.
+        // Limit cleanup to the short, noninteractive strip at the viewport edge.
+        if (d.querySelector('textarea, [contenteditable], [role="textbox"]')) {
+          for (const hit of d.elementsFromPoint(w.innerWidth / 2, w.innerHeight - 8)) {
+            let strip = hit;
+            for (let depth = 0; strip && depth < 4; depth++, strip = strip.parentElement) {
+              const rect = strip.getBoundingClientRect();
+              if (rect.height > 220 || rect.width < w.innerWidth * 0.6 || rect.bottom < w.innerHeight - 2) continue;
+              if (!strip.matches('div, p, footer, [role="contentinfo"]') || strip.textContent.trim().length > 80 ||
+                strip.closest('pre, code, [data-message-role], [data-testid*="message"]') ||
+                strip.querySelector('textarea, input, button, a, pre, [contenteditable]') ||
+                !neutral(w.getComputedStyle(strip).backgroundColor)) continue;
+              strip.setAttribute('data-dsq-surface', 'shell');
+              marked.add(strip);
+              layoutNodes.add(strip);
+            }
           }
         }
         // Clear only the same-width backing behind the rounded composer.
@@ -255,8 +272,8 @@
             if (Number.parseFloat(w.getComputedStyle(frame).borderTopLeftRadius) < 8) continue;
             const bounds = frame.getBoundingClientRect();
             // Website fades use empty elements or pseudo-elements beside the card.
-            // Keep the original lower fade for the card shadow; mask only the upper
-            // decoration. Geometry follows the editor as it grows or resizes.
+            // Empty page fades must not repaint an opaque footer over the native
+            // backdrop. Keep the rounded card and its own shadow untouched.
             let host = frame;
             for (let step = 0; host && step < 6 && host !== d.body; step++, host = host.parentElement) {
               const hostBounds = host.getBoundingClientRect();
@@ -277,17 +294,15 @@
                   filter: paint.filter,
                   backdropFilter: paint.backdropFilter,
                   webkitBackdropFilter: paint.webkitBackdropFilter,
-                }, bounds)) continue;
+                }, { ...bounds, width: bounds.width, height: bounds.height, viewportWidth: w.innerWidth })) continue;
                 const attr = 'data-dsq-composer-decoration';
                 child.setAttribute(attr, '');
-                child.style.setProperty('--dsq-composer-bottom', `${bounds.bottom - rect.top}px`);
                 composerDecorations.set(child, [attr]);
               }
               for (const pseudo of ['before', 'after']) {
-                if (!isComposerDecoration(w.getComputedStyle(host, `::${pseudo}`), bounds)) continue;
+                if (!isComposerDecoration(w.getComputedStyle(host, `::${pseudo}`), { width: bounds.width, height: bounds.height, viewportWidth: w.innerWidth })) continue;
                 const attr = `data-dsq-composer-${pseudo}`;
                 host.setAttribute(attr, '');
-                host.style.setProperty('--dsq-composer-bottom', `${bounds.bottom - hostBounds.top}px`);
                 const attrs = composerDecorations.get(host) || [];
                 attrs.push(attr);
                 composerDecorations.set(host, attrs);
@@ -324,7 +339,6 @@
         composerBackings.clear();
         for (const [el, attrs] of composerDecorations) {
           for (const attr of attrs) el.removeAttribute(attr);
-          el.style.removeProperty('--dsq-composer-bottom');
         }
         composerDecorations.clear();
       } finally {

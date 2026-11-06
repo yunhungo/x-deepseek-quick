@@ -127,3 +127,14 @@ test('delayed IME confirmation skips send handlers while native commitment and n
   dispatch(229);
   assert.deepEqual(seen, [13, 229, 229, 229], 'disposal removes the listener');
 });
+
+
+test('wide desktop composer fades are bounded by the viewport, not the card width', () => {
+  const fade = { content: '', position: 'absolute', pointerEvents: 'none',
+    width: '896px', height: '152px', backgroundImage: 'linear-gradient(transparent, black)', filter: 'none' };
+  const frame = { width: 608, height: 124, viewportWidth: 960 };
+  assert.equal(isComposerDecoration(fade, frame), true);
+  assert.equal(isComposerDecoration({ ...fade, width: '1100px' }, frame), false);
+  assert.equal(isComposerDecoration({ ...fade, pointerEvents: 'auto' }, frame), false);
+  assert.equal(isComposerDecoration({ ...fade, height: '500px' }, frame), false);
+});
