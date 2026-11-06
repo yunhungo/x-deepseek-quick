@@ -21,7 +21,7 @@ macOS 隐藏原生标题栏与交通灯，顶部空白可拖动；按钮和输�
 
 ## 输入法兼容
 
-macOS 通过公开的 `WKWebViewConfiguration.applicationNameForUserAgent` 追加 `DSQuick/<版本> Safari` 兼容标识，保留 WebKit 自动生成的系统和引擎信息。官网按 `Safari` 标识启用已有的组合输入处理；默认 WKWebView 标识缺少该字样，会导致确认拼音为英文的回车被当作发送。应用不监听或拦截键盘/组合输入事件，不改官网发送逻辑，也不硬编码 Safari 版本。更新时用真实中文输入法检查回车确认英文、空格确认中文、正常回车发送及 Shift+回车换行。
+macOS 通过公开的 `WKWebViewConfiguration.applicationNameForUserAgent` 追加 `DSQuick/<版本> Safari` 兼容标识，保留 WebKit 自动生成的系统和引擎信息，启用官网的已有兼容分支。微信输入法实测会在 `compositionend` 后 13ms 发出 `Enter / keyCode 229 / isComposing=false`，超过官网 10ms 的组词状态保留时间。因此适配器在允许的站点、macOS WebKit 编辑区内，仅阻止 `Enter + 229` 进入网页快捷键处理；不取消原生输入法默认动作，不拦截普通 Enter，不依赖计时器或组词状态。更新时用真实微信输入法检查回车确认英文、空格确认中文、正常回车发送及 Shift+回车换行。
 
 ## 磨砂和网站适配
 

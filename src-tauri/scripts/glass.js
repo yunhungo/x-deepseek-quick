@@ -67,12 +67,28 @@
     };
   }
 
+  // WeType can deliver its confirming Enter after compositionend and after
+  // the site's 10ms grace period. 229 identifies the actual IME key, without
+  // guessing from elapsed time or suppressing the next intentional Enter.
+  function installImeConfirmation(w) {
+    function confirm(event) {
+      if (event.key !== 'Enter' || event.keyCode !== 229) return;
+      if (!event.target?.closest?.('textarea, [contenteditable]:not([contenteditable="false"])')) return;
+      // Keep native text commitment; only exclude this IME key from site shortcuts.
+      event.stopImmediatePropagation();
+    }
+    w.addEventListener('keydown', confirm, { capture: true });
+    return () => w.removeEventListener('keydown', confirm, { capture: true });
+  }
+
   function install(w) {
     const d = w.document;
     const cfg = w.__DEEPSEEK_GLASS__;
     if (!cfg) return;
     const hosts = new Set((cfg.allowedHosts || []).map((host) => String(host).toLowerCase()));
     if (!hosts.has(w.location.hostname)) return;
+    const disposeIme = /Mac/.test(w.navigator.platform) && /AppleWebKit/.test(w.navigator.userAgent)
+      ? installImeConfirmation(w) : () => {};
     let observer;
     let disposed = false;
     const scheduler = createRefreshScheduler(w, refresh);
@@ -324,6 +340,7 @@
       disposed = true;
       observer?.disconnect();
       scheduler.dispose();
+      disposeIme();
       d.removeEventListener('mousedown', drag, { capture: true });
       d.removeEventListener('scroll', scheduler.onScroll, { capture: true });
       w.removeEventListener('resize', schedule);
@@ -335,5 +352,5 @@
     else start();
   }
 
-  return { POLICY, classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, install };
+  return { POLICY, classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, installImeConfirmation, install };
 });

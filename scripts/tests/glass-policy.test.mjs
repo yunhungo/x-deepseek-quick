@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const sandbox = { module: { exports: {} } };
 runInNewContext(readFileSync(new URL('../../src-tauri/scripts/glass.js', import.meta.url), 'utf8'), sandbox);
-const { classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, install } = sandbox.module.exports;
+const { classifySurface, isComposerBacking, isComposerDecoration, createRefreshScheduler, installImeConfirmation, install } = sandbox.module.exports;
 const shell = { layoutRoot: true, neutral: true, widthRatio: 1, heightRatio: 1 };
 
 test('only a verified layout root can be cleared', () => {
@@ -97,4 +97,33 @@ test('adaptation waits until native momentum scrolling is quiet and cancels on d
   scheduler.schedule(); scheduler.dispose(); advance(1000);
   assert.equal(refreshes, 1);
   assert.equal(jobs.size, 0);
+});
+
+
+test('delayed IME confirmation skips send handlers while native commitment and next Enter survive', () => {
+  const window = new EventTarget();
+  const dispose = installImeConfirmation(window);
+  const seen = [];
+  window.addEventListener('keydown', event => seen.push(event.keyCode));
+  function dispatch(code, editable = true, key = 'Enter') {
+    const event = new Event('keydown', { cancelable: true });
+    Object.defineProperties(event, {
+      key: { value: key }, keyCode: { value: code }, isComposing: { value: false },
+      target: { value: { closest: () => editable ? {} : null } },
+    });
+    window.dispatchEvent(event);
+    assert.equal(event.defaultPrevented, false, 'IME default action must commit the text');
+  }
+  // Captured WeType sample: compositionend -> 13ms -> Enter/229/isComposing=false.
+  // No grace timer is involved, so the delay cannot change the outcome.
+  dispatch(229);
+  assert.deepEqual(seen, []);
+  dispatch(13);
+  assert.deepEqual(seen, [13], 'next intentional Enter still reaches the website');
+  dispatch(229, false);
+  dispatch(229, true, 'a');
+  assert.deepEqual(seen, [13, 229, 229], 'other controls and non-Enter keys are untouched');
+  dispose();
+  dispatch(229);
+  assert.deepEqual(seen, [13, 229, 229, 229], 'disposal removes the listener');
 });
