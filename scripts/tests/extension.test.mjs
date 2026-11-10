@@ -280,7 +280,7 @@ const sourceScript = await readFile(
   new URL('../../extension/source.js', import.meta.url),
   'utf8',
 );
-test('Escape removes selection interceptors and selection can start again', async () => {
+function sourceContext() {
   const listeners = new Map();
   let receive;
   class FakeElement {
@@ -293,7 +293,8 @@ test('Escape removes selection interceptors and selection can start again', asyn
       this.children.push(...nodes);
     }
     attachShadow() {
-      return new FakeElement();
+      this.shadow = new FakeElement();
+      return this.shadow;
     }
     remove() {
       this.removed = true;
@@ -314,10 +315,14 @@ test('Escape removes selection interceptors and selection can start again', asyn
       listeners.get(type)?.delete(handler);
     },
   };
+  let focused = true;
   const document = {
     createElement: () => new FakeElement(),
     documentElement: new FakeElement(),
+    hasFocus: () => focused,
   };
+  document.documentElement.clientWidth = 1200;
+  document.documentElement.clientHeight = 800;
   vm.runInNewContext(sourceScript, {
     window,
     document,
@@ -345,9 +350,31 @@ test('Escape removes selection interceptors and selection can start again', asyn
     setTimeout,
   });
   const message = (type) => receive({ type }, { id: 'test-id' }, () => {});
+  const host = document.documentElement.children[0];
+  const box = host.shadow.children.find(
+    (node) => node.className === 'floating',
+  );
+  return {
+    listeners,
+    document,
+    host,
+    box,
+    frame: box.children[0],
+    message,
+    setFocus(value) {
+      focused = value;
+    },
+    dispatch(type, event = {}) {
+      for (const handler of listeners.get(type) || []) handler(event);
+    },
+  };
+}
+test('Escape removes selection interceptors and selection can start again', async () => {
+  const { listeners, message } = sourceContext();
+  const baselinePointerListeners = listeners.get('pointerdown').size;
   message('pick');
   assert.equal(listeners.get('click').size, 1);
-  assert.equal(listeners.get('pointerdown').size, 1);
+  assert.equal(listeners.get('pointerdown').size, baselinePointerListeners + 1);
   let prevented = false;
   for (const handler of [...listeners.get('keydown')])
     handler({
@@ -358,14 +385,9 @@ test('Escape removes selection interceptors and selection can start again', asyn
       stopImmediatePropagation() {},
     });
   assert.equal(prevented, true);
-  for (const type of [
-    'click',
-    'pointerdown',
-    'pointermove',
-    'keydown',
-    'scroll',
-  ])
+  for (const type of ['click', 'pointermove', 'keydown', 'scroll'])
     assert.equal(listeners.get(type)?.size || 0, 0);
+  assert.equal(listeners.get('pointerdown').size, baselinePointerListeners);
   message('pick');
   assert.equal(listeners.get('click').size, 1);
   message('cancel-pick');
@@ -1045,4 +1067,79 @@ test('popup completion never reopens a side panel from the worker', async () => 
     );
     assert.ok(context.calls.some((call) => call[0] === 'rules'));
   }
+});
+
+test('floating panel fades on outside interaction, restores on hover, and ignores scrolling', () => {
+  const context = sourceContext();
+  const { message, dispatch, box, host } = context;
+  message('show-floating');
+  assert.equal(box.dataset.inactive, 'false');
+  const outside = {
+    target: {},
+    clientX: 600,
+    clientY: 100,
+    preventDefault() {},
+    stopImmediatePropagation() {},
+  };
+  dispatch('wheel', outside);
+  dispatch('scroll', outside);
+  assert.equal(box.dataset.inactive, 'false');
+  dispatch('pointerdown', { ...outside, clientX: 1200 });
+  assert.equal(
+    box.dataset.inactive,
+    'false',
+    'native scrollbar drag stays active',
+  );
+  dispatch('pointerdown', outside);
+  assert.equal(box.dataset.inactive, 'true');
+  dispatch('wheel', outside);
+  dispatch('scroll', outside);
+  assert.equal(
+    box.dataset.inactive,
+    'true',
+    'scrolling does not toggle opacity',
+  );
+  dispatch('pointerover', { target: host });
+  assert.equal(box.dataset.inactive, 'false');
+  dispatch('focusin', outside);
+  assert.equal(box.dataset.inactive, 'true');
+  dispatch('focusin', { target: host });
+  assert.equal(box.dataset.inactive, 'false');
+  message('pick');
+  dispatch('pointerdown', outside);
+  assert.equal(
+    box.dataset.inactive,
+    'false',
+    'element selection keeps its restore state',
+  );
+  message('cancel-pick');
+  message('hide-floating');
+  dispatch('pointerdown', outside);
+  assert.equal(
+    box.dataset.inactive,
+    'false',
+    'hidden/fixed mode does not fade',
+  );
+});
+
+test('nested iframe focus does not fade, app focus loss does, and reopening restores', async () => {
+  const context = sourceContext();
+  const { message, dispatch, document, box, host } = context;
+  message('show-floating');
+  document.activeElement = host;
+  dispatch('blur');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(box.dataset.inactive, 'false');
+  context.setFocus(false);
+  dispatch('blur');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(box.dataset.inactive, 'true');
+  context.setFocus(true);
+  dispatch('focus');
+  assert.equal(box.dataset.inactive, 'false');
+  dispatch('focusin', { target: {} });
+  assert.equal(box.dataset.inactive, 'true');
+  message('show-floating');
+  assert.equal(box.dataset.inactive, 'false');
+  dispatch('pagehide');
 });

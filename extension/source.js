@@ -20,6 +20,54 @@
   frame.title = 'DSQuick';
   box.append(frame);
   shadow.append(box);
+  let focusTimer;
+  function setInactive(inactive) {
+    box.dataset.inactive = String(inactive);
+  }
+  function insidePanel(event) {
+    return (
+      event.composedPath?.().includes(host) ||
+      [host, box, frame].includes(event.target)
+    );
+  }
+  function focusChanged(event) {
+    if (box.hidden || selecting) return;
+    setInactive(!insidePanel(event));
+  }
+  window.addEventListener(
+    'pointerdown',
+    (event) => {
+      // Native page scrollbar drags count as scrolling, not leaving the panel.
+      if (
+        event.clientX >= document.documentElement.clientWidth ||
+        event.clientY >= document.documentElement.clientHeight
+      )
+        return;
+      focusChanged(event);
+    },
+    true,
+  );
+  window.addEventListener('focusin', focusChanged, true);
+  window.addEventListener(
+    'pointerover',
+    (event) => {
+      if (insidePanel(event)) setInactive(false);
+    },
+    true,
+  );
+  window.addEventListener('focus', () => {
+    clearTimeout(focusTimer);
+    if (document.activeElement === host || document.activeElement === frame)
+      setInactive(false);
+  });
+  window.addEventListener('blur', () => {
+    clearTimeout(focusTimer);
+    // Entering either nested iframe also blurs this window; document.hasFocus
+    // stays true in that case. No scroll/wheel listener changes this state.
+    focusTimer = setTimeout(() => {
+      if (!box.hidden && !selecting && !document.hasFocus()) setInactive(true);
+    }, 0);
+  });
   let saveBoundsTimer;
   chrome.storage.local
     .get('floatingBounds')
@@ -140,6 +188,7 @@
   }
   function stop() {
     selecting = false;
+    setInactive(false);
     box.style.visibility = '';
     cancelAnimationFrame(raf);
     mark.remove();
@@ -224,6 +273,7 @@
           `panel.html?floating=1&source=${message.tabId}`,
         );
       box.hidden = message.toggle ? !box.hidden : false;
+      if (!box.hidden) setInactive(false);
     }
     if (message.type === 'hide-floating') {
       stop();
@@ -266,5 +316,6 @@
   window.addEventListener('pagehide', () => {
     stop();
     clearTimeout(saveBoundsTimer);
+    clearTimeout(focusTimer);
   });
 })();
