@@ -1143,3 +1143,48 @@ test('nested iframe focus does not fade, app focus loss does, and reopening rest
   assert.equal(box.dataset.inactive, 'false');
   dispatch('pagehide');
 });
+
+test('embedded website switches both ways only for trusted panel theme messages', () => {
+  const handlers = {};
+  const parent = {};
+  function element() {
+    const tokens = new Set();
+    const styles = new Map();
+    return {
+      dataset: {},
+      classList: {
+        toggle: (name, enabled) => enabled ? tokens.add(name) : tokens.delete(name),
+        contains: (name) => tokens.has(name),
+      },
+      style: {
+        getPropertyValue: (name) => styles.get(name),
+        setProperty: (name, value) => styles.set(name, value),
+      },
+    };
+  }
+  const root = element();
+  const body = element();
+  const context = vm.createContext({
+    parent,
+    window: { top: {}, addEventListener: (type, fn) => { handlers[type] = fn; } },
+    document: { documentElement: root, body },
+    chrome: { runtime: { getURL: () => 'chrome-extension://test-id/' } },
+  });
+  vm.runInContext(bootstrapScript, context);
+  const send = (scheme, origin = 'chrome-extension://test-id') => handlers.message({
+    source: parent, origin, data: { type: 'dsquick-configure', scheme },
+  });
+  send('dark', 'https://untrusted.example');
+  assert.equal(root.dataset.theme, undefined);
+  for (const scheme of ['dark', 'light', 'dark']) {
+    send(scheme);
+    for (const node of [root, body]) {
+      assert.equal(node.dataset.theme, scheme);
+      assert.equal(node.classList.contains('dark'), scheme === 'dark');
+      assert.equal(node.classList.contains('light'), scheme === 'light');
+    }
+    assert.equal(root.style.getPropertyValue('color-scheme'), scheme);
+  }
+  send('invalid');
+  assert.equal(root.dataset.theme, 'dark');
+});

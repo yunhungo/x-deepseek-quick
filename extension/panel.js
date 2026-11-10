@@ -16,9 +16,13 @@ document.querySelector('#toolbar').hidden = !floating;
 document.documentElement.dataset.mode = floating ? 'floating' : 'fixed';
 let selecting = false;
 const chat = document.querySelector('#chat');
+let theme = 'system';
 function configureGlass() {
   chat.contentWindow.postMessage(
-    { type: 'dsquick-configure' },
+    {
+      type: 'dsquick-configure',
+      scheme: resolveScheme(theme, matchMedia('(prefers-color-scheme: dark)').matches),
+    },
     'https://chat.deepseek.com',
   );
 }
@@ -66,12 +70,13 @@ await act(async () => {
 });
 const settings = await chrome.storage.local.get('theme');
 const labels = THEME_LABELS;
-let theme = normalizeTheme(settings.theme);
+theme = normalizeTheme(settings.theme);
 const themeButton = document.querySelector('#theme');
 const themeMenu = document.querySelector('#theme-menu');
 const themeOptions = [...themeMenu.querySelectorAll('button')];
 function applyTheme() {
   applyAppearance(theme);
+  configureGlass();
   if (floating)
     request('frame-scheme', {
       scheme: resolveScheme(

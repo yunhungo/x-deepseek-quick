@@ -9,6 +9,20 @@
   let adapter;
   let authorized = false;
   let installed = false;
+  let scheme;
+  function syncTheme() {
+    if (!scheme) return;
+    const root = document.documentElement;
+    for (const element of [root, document.body]) {
+      if (!element) continue;
+      element.classList.toggle('dark', scheme === 'dark');
+      element.classList.toggle('light', scheme === 'light');
+      if (element.dataset.theme !== scheme) element.dataset.theme = scheme;
+    }
+    if (root.style.getPropertyValue('color-scheme') !== scheme) {
+      root.style.setProperty('color-scheme', scheme, 'important');
+    }
+  }
   function install() {
     if (!authorized || !adapter || installed) return;
     installed = true;
@@ -58,6 +72,7 @@
     }
     const root = document.documentElement;
     function tint() {
+      syncTheme();
       const dark = root.hasAttribute('data-dsq-dark');
       const tintValue = dark ? 'rgba(0,0,0,.42)' : 'rgba(255,255,255,.32)';
       if (root.style.getPropertyValue('--dsq-backdrop-tint') !== tintValue) {
@@ -95,6 +110,10 @@
     )
       return;
     authorized = true;
+    if (['light', 'dark'].includes(event.data.scheme)) {
+      scheme = event.data.scheme;
+      syncTheme();
+    }
     install();
   });
 })();
