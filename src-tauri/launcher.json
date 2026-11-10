@@ -1,6 +1,5 @@
 {
   "chatUrl": "https://chat.deepseek.com/",
-  "shortcut": "CommandOrControl+Shift+D",
   "allowedHosts": ["chat.deepseek.com"],
   "glass": {
     "enabled": true,

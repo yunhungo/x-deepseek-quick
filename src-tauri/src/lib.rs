@@ -1,12 +1,11 @@
 // @created 2026-11-03
-// @description 组装桌面窗口、磨砂材质与全局快捷键
+// @description 组装桌面窗口、磨砂材质与登录弹窗
 // @author yunhungo
 //! DeepSeek Glass — a native window around the public DeepSeek chat page.
 //!
 //! The webview loads `https://chat.deepseek.com/` (or the URL in launcher.json).
 //! Window material, transparency, and the title bar live in `tauri.conf.json`.
-//! Rust adds three things the config file cannot express: the background
-//! softening script, popup handling for sign-in, and the show/hide hotkey.
+//! Rust adds the background softening script and popup handling for sign-in.
 
 mod config;
 
@@ -71,7 +70,6 @@ pub fn run() {
 
             let settings = Settings::load(app.handle());
             open_main(app.handle(), &settings)?;
-            register_hotkey(app.handle(), &settings)?;
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -177,9 +175,8 @@ fn open_main(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::er
     let _ = hide_instead_of_close;
 
     eprintln!(
-        "DeepSeek Glass: chat {} | hotkey {} | glass {}",
+        "DeepSeek Glass: chat {} | glass {}",
         settings.chat_url,
-        settings.shortcut,
         if settings.glass_applies() {
             "on"
         } else {
@@ -237,37 +234,6 @@ fn hide_instead_of_close(window: &WebviewWindow) {
     });
 }
 
-fn register_hotkey(app: &AppHandle, settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(desktop)]
-    {
-        use tauri_plugin_global_shortcut::ShortcutState;
-
-        let registered =
-            tauri_plugin_global_shortcut::Builder::new().with_shortcut(settings.shortcut.as_str());
-        let builder = match registered {
-            Ok(builder) => builder.with_handler(|app, _shortcut, event| {
-                if event.state != ShortcutState::Pressed {
-                    return;
-                }
-                toggle(app);
-            }),
-            Err(error) => {
-                eprintln!(
-                    "DeepSeek Glass: shortcut {:?} was rejected ({error}). The Dock icon still opens the app.",
-                    settings.shortcut
-                );
-                tauri_plugin_global_shortcut::Builder::new()
-            }
-        };
-        app.plugin(builder.build())?;
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = (app, settings);
-    }
-    Ok(())
-}
-
 fn reveal(app: &AppHandle) {
     let Some(window) = app.get_webview_window(MAIN_LABEL) else {
         return;
@@ -275,20 +241,6 @@ fn reveal(app: &AppHandle) {
     let _ = window.show();
     let _ = window.unminimize();
     let _ = window.set_focus();
-}
-
-fn toggle(app: &AppHandle) {
-    let Some(window) = app.get_webview_window(MAIN_LABEL) else {
-        return;
-    };
-    let visible = window.is_visible().unwrap_or(false);
-    let minimized = window.is_minimized().unwrap_or(false);
-    let focused = window.is_focused().unwrap_or(false);
-    if visible && focused && !minimized {
-        let _ = window.hide();
-        return;
-    }
-    reveal(app);
 }
 
 #[cfg(test)]

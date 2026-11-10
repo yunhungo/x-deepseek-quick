@@ -15,7 +15,7 @@ npm run tauri build -- --bundles app
 
 macOS 成果为 `src-tauri/target/release/bundle/macos/DSQuick.app`。其他系统运行 `npm run tauri build`，在 `src-tauri/target/release/bundle/` 获取对应安装包。桌面库仅生成 `rlib`，不生成移动端库。
 
-默认快捷键为 macOS 的 Command+Shift+D、其他系统的 Ctrl+Shift+D，用于显示或隐藏窗口。macOS 用 Command+Q 退出，Command+W 隐藏窗口。再次启动会显示已有窗口。
+桌面 App 不注册全局快捷键。macOS 用 Command+Q 退出，Command+W 隐藏窗口；点击 Dock 图标或再次启动会显示已有窗口。
 
 macOS 隐藏原生标题栏与交通灯，顶部空白可拖动；按钮和输入控件优先接收点击。整个窗口采用 20px 圆角，最小尺寸为 420 × 480。窗口大小和位置自动保存。
 
@@ -52,7 +52,7 @@ npm run tauri bundle -- --bundles app
 
 首次启动从 `src-tauri/launcher.json` 创建本机配置。macOS 位于 `~/Library/Application Support/app.deepseekglass.launcher/launcher.json`；Linux 位于 `~/.config/app.deepseekglass.launcher/launcher.json`；Windows 位于对应应用配置目录。也可用 `DEEPSEEK_GLASS_CONFIG` 指定本机配置文件，修改后重启。
 
-配置支持 `chatUrl`（HTTPS）、`shortcut`、`allowedHosts` 和 `glass.enabled`。仅允许主机上运行适配脚本。旧版透明度和覆盖阈值字段仍可读取以兼容旧文件，但保守适配器不再用这些值识别消息或逐层叠加底色。
+配置支持 `chatUrl`（HTTPS）、`allowedHosts` 和 `glass.enabled`。仅允许主机上运行适配脚本。旧版透明度和覆盖阈值字段仍可读取以兼容旧文件，但保守适配器不再用这些值识别消息或逐层叠加底色。
 
 WebView 明确关闭无痕模式，使用系统持久化网站数据存储。Cookie、Local Storage 与登录状态由 WebKit/WebView 在本机管理，不导出到源码或配置。保留原应用标识 `app.deepseekglass.launcher`，改名不会主动隔离原有登录数据；会话期限、退出登录和远端撤销仍由 DeepSeek 控制。窗口状态与本机配置、网站数据都不应进入 Git。
 

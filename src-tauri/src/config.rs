@@ -5,7 +5,7 @@
 //!
 //! The copy in `src-tauri/launcher.json` is the built-in default. On first
 //! launch the app writes that file to the OS config directory and reads it
-//! from there afterwards, so a daily shortcut can be changed without a rebuild.
+//! from there afterwards, so launcher settings can change without a rebuild.
 
 use std::path::{Path, PathBuf};
 
@@ -14,7 +14,6 @@ use tauri::{AppHandle, Manager, WebviewUrl, utils::config::WindowConfig};
 use url::Url;
 
 pub const DEFAULT_CHAT_URL: &str = "https://chat.deepseek.com/";
-pub const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+D";
 pub const CONFIG_FILE: &str = "launcher.json";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -22,8 +21,6 @@ pub const CONFIG_FILE: &str = "launcher.json";
 pub struct Settings {
     #[serde(default = "default_chat_url")]
     pub chat_url: String,
-    #[serde(default = "default_shortcut")]
-    pub shortcut: String,
     #[serde(default = "default_hosts")]
     pub allowed_hosts: Vec<String>,
     pub glass: GlassSettings,
@@ -66,7 +63,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             chat_url: DEFAULT_CHAT_URL.into(),
-            shortcut: DEFAULT_SHORTCUT.into(),
             allowed_hosts: default_hosts(),
             glass: GlassSettings::default(),
         }
@@ -182,11 +178,6 @@ impl Settings {
         }
         self.chat_url = url.to_string();
 
-        self.shortcut = self.shortcut.trim().to_string();
-        if self.shortcut.is_empty() {
-            return Err("shortcut must not be empty".into());
-        }
-
         let hosts = self
             .allowed_hosts
             .iter()
@@ -278,10 +269,6 @@ fn default_chat_url() -> String {
     DEFAULT_CHAT_URL.into()
 }
 
-fn default_shortcut() -> String {
-    DEFAULT_SHORTCUT.into()
-}
-
 fn default_hosts() -> Vec<String> {
     vec!["chat.deepseek.com".into()]
 }
@@ -314,13 +301,24 @@ mod tests {
     fn builtin_file_parses() {
         let settings = Settings::builtin();
         assert_eq!(settings.chat_url, "https://chat.deepseek.com/");
-        assert_eq!(settings.shortcut, DEFAULT_SHORTCUT);
         assert_eq!(
             settings.allowed_hosts,
             vec!["chat.deepseek.com".to_string()]
         );
         assert!(settings.glass.enabled);
         assert!((settings.glass.shell_alpha - 0.74).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn legacy_shortcut_is_ignored() {
+        let settings = Settings::parse(r#"{"shortcut":"CommandOrControl+Shift+D"}"#).unwrap();
+        assert_eq!(settings, Settings::builtin());
+        assert!(
+            serde_json::to_value(settings)
+                .unwrap()
+                .get("shortcut")
+                .is_none()
+        );
     }
 
     #[test]
@@ -345,7 +343,6 @@ mod tests {
         .unwrap();
 
         assert_eq!(settings.chat_url, "https://chat.deepseek.com/sign_in");
-        assert_eq!(settings.shortcut, "Alt+Space");
         assert_eq!(
             settings.allowed_hosts,
             vec!["chat.deepseek.com".to_string()]
@@ -360,7 +357,6 @@ mod tests {
             Settings::parse(r#"{"chatUrl":"https://chat.deepseek.com/","allowedHosts":[]}"#)
                 .unwrap();
         assert_eq!(settings.allowed_hosts, default_hosts());
-        assert_eq!(settings.shortcut, DEFAULT_SHORTCUT);
     }
 
     #[test]
