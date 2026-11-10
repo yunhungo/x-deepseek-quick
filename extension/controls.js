@@ -8,6 +8,7 @@ import {
   applyAppearance,
   saveAppearance,
 } from './appearance.js';
+import { configureFixedPanel, openFixedPanel } from './panel-opening.js';
 
 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 const settings = await chrome.storage.local.get(['mode', 'theme']);
@@ -19,6 +20,15 @@ function applyTheme() {
   applyAppearance(theme.value);
 }
 applyTheme();
+// Prepare the tab-specific path before enabling click handlers. Opening itself
+// stays inside the subsequent user gesture, directly in this extension page.
+if (tab?.id && /^https?:/.test(tab.url || '')) {
+  try {
+    await configureFixedPanel(chrome, tab.id);
+  } catch {
+    // Opening retries configuration and reports failure through the normal toast.
+  }
+}
 let timer;
 function report(error) {
   const notice = document.querySelector('#notice');
@@ -36,18 +46,35 @@ async function act(fn) {
     report(error);
   }
 }
-function show() {
+function requestPanel(type, action) {
   if (!tab?.id) return Promise.reject(new Error('请先打开网页'));
-  return chrome.runtime
-    .sendMessage({ type: 'show', tabId: tab.id, mode: mode.value })
+  const selectedMode = mode.value;
+  const fixed = selectedMode === 'fixed';
+  const opening = fixed ? openFixedPanel(chrome, tab.id) : Promise.resolve();
+  return opening
+    .then(() =>
+      chrome.runtime.sendMessage({
+        type,
+        tabId: tab.id,
+        mode: selectedMode,
+        action,
+        panelOpened: fixed,
+      }),
+    )
     .then((result) => {
       if (!result?.ok) throw new Error(result?.error || '无法打开面板');
     });
 }
+function show() {
+  return requestPanel('show');
+}
 mode.onchange = () =>
-  act(async () => {
-    await chrome.storage.local.set({ mode: mode.value });
-    await show();
+  act(() => {
+    const opening = show();
+    return Promise.all([
+      opening,
+      chrome.storage.local.set({ mode: mode.value }),
+    ]);
   });
 theme.onchange = () =>
   act(async () => {
@@ -55,14 +82,8 @@ theme.onchange = () =>
     applyTheme();
   });
 document.querySelector('#open').onclick = () => act(show);
-async function capture(action) {
-  const result = await chrome.runtime.sendMessage({
-    type: 'capture-request',
-    tabId: tab.id,
-    action,
-    mode: mode.value,
-  });
-  if (!result?.ok) throw new Error(result?.error || '无法采集网页');
+function capture(action) {
+  return requestPanel('capture-request', action);
 }
 document.querySelector('#select').onclick = () => act(() => capture('pick'));
 document.querySelector('#whole').onclick = () => act(() => capture('page'));

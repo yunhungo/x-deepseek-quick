@@ -9,6 +9,7 @@ import {
   validAuthValue,
   validVault,
 } from './auth-session.js';
+import { openFixedPanel } from './panel-opening.js';
 
 // Serialize preparation so parallel panels cannot replace one another's rules.
 let embedQueue = Promise.resolve();
@@ -215,17 +216,19 @@ chrome.storage.onChanged.addListener((changes) => {
 chrome.runtime.onInstalled.addListener(() =>
   chrome.sidePanel.setOptions({ enabled: false }),
 );
-async function activate(tab, mode = preferredMode, toggle = false) {
+async function activate(
+  tab,
+  mode = preferredMode,
+  toggle = false,
+  panelOpened = false,
+) {
   if (!tab?.id || !/^https?:/.test(tab.url || ''))
     throw new Error('请先打开网页');
   if (mode === 'fixed') {
-    const configured = chrome.sidePanel.setOptions({
-      tabId: tab.id,
-      path: `panel.html?source=${tab.id}`,
-      enabled: true,
-    });
-    const opened = chrome.sidePanel.open({ tabId: tab.id });
-    await Promise.all([configured, opened, prepareEmbed(tab.id)]);
+    await Promise.all([
+      panelOpened ? Promise.resolve() : openFixedPanel(chrome, tab.id),
+      prepareEmbed(tab.id),
+    ]);
     await chrome.tabs
       .sendMessage(tab.id, { type: 'hide-floating' })
       .catch(() => {});
@@ -245,14 +248,19 @@ async function activate(tab, mode = preferredMode, toggle = false) {
     toggle,
   });
 }
-async function openCapture(tab, action, mode = preferredMode) {
+async function openCapture(
+  tab,
+  action,
+  mode = preferredMode,
+  panelOpened = false,
+) {
   if (!tab?.id || !/^https?:/.test(tab.url || ''))
     throw new Error('请先打开网页');
   const key = `capture:${tab.id}`;
   const task = { action, mode, id: crypto.randomUUID() };
   // Start opening synchronously so Chrome retains the shortcut's user gesture.
   // New panels read the task on startup; existing panels observe its update.
-  const opening = activate(tab, mode);
+  const opening = activate(tab, mode, false, panelOpened);
   try {
     await Promise.all([opening, chrome.storage.session.set({ [key]: task })]);
   } catch (error) {
@@ -372,11 +380,17 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
         tab,
         message.action,
         message.mode === 'fixed' ? 'fixed' : 'floating',
+        message.panelOpened === true,
       );
       return {};
     }
     if (message.type === 'show') {
-      await activate(tab, message.mode === 'fixed' ? 'fixed' : 'floating');
+      await activate(
+        tab,
+        message.mode === 'fixed' ? 'fixed' : 'floating',
+        false,
+        controls && message.panelOpened === true,
+      );
       return {};
     }
     if (message.type === 'source') return { tabId };

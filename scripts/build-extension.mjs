@@ -18,6 +18,7 @@ for (const file of [
   'controls.js',
   'icons.svg',
   'appearance.js',
+  'panel-opening.js',
   'login-scope.js',
   'auth-client.js',
   'auth-session.js',

@@ -7,10 +7,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+const panelOpening = await import('../../extension/panel-opening.js');
 const authContract = await import('../../extension/auth-session.js');
 const workerSource = (
   await readFile(new URL('../../extension/worker.js', import.meta.url), 'utf8')
-).replace(/^import\s*\{[\s\S]*?\}\s*from '\.\/auth-session\.js';\s*/m, '');
+)
+  .replace(/^import[\s\S]*?from '\.\/auth-session\.js';\s*/m, '')
+  .replace(/^import .*panel-opening.js';\s*/m, '');
 const uploadSource = await readFile(
   new URL('../../extension/upload.js', import.meta.url),
   'utf8',
@@ -121,6 +124,7 @@ function worker() {
     URL,
     crypto,
     ...authContract,
+    ...panelOpening,
   });
   const message = (body, sender) =>
     new Promise((resolve) => handlers.message(body, sender, resolve));
@@ -952,4 +956,93 @@ test('popup capture and shortcut capture use the same queue contract', async () 
   assert.equal(context.state['capture:7'].action, 'page');
   assert.equal(context.state['capture:7'].mode, 'fixed');
   assert.ok(context.calls.some((call) => call[0] === 'open'));
+});
+
+test('popup opens fixed panels inside the click before settings or worker messages', async () => {
+  const source = (
+    await readFile(
+      new URL('../../extension/controls.js', import.meta.url),
+      'utf8',
+    )
+  ).replace(/^import[\s\S]*?from '[^']+';\s*/gm, '');
+  const elements = new Map();
+  const element = (key) => {
+    if (!elements.has(key))
+      elements.set(key, {
+        value: '',
+        querySelector: () => ({ textContent: '' }),
+      });
+    return elements.get(key);
+  };
+  const calls = [];
+  let gesture = false;
+  const chrome = {
+    tabs: { query: async () => [{ id: 7, url: 'https://example.com/' }] },
+    storage: {
+      local: {
+        get: async () => ({ mode: 'fixed', theme: 'system' }),
+        set: async () => {
+          calls.push('save');
+          await Promise.resolve();
+        },
+      },
+    },
+    sidePanel: {
+      setOptions: async () => {
+        calls.push('configure');
+      },
+      open: async () => {
+        assert.equal(gesture, true);
+        calls.push('open');
+      },
+    },
+    runtime: {
+      sendMessage: async (message) => {
+        calls.push(message);
+        return { ok: true };
+      },
+    },
+  };
+  await vm.runInNewContext(`(async () => { ${source} })()`, {
+    chrome,
+    document: { querySelector: element },
+    window: { addEventListener() {} },
+    location: { search: '' },
+    URLSearchParams,
+    normalizeTheme: (theme) => theme,
+    applyAppearance() {},
+    saveAppearance: async () => {},
+    ...panelOpening,
+    setTimeout,
+    clearTimeout,
+  });
+  for (const selector of ['#open', '#select', '#whole', '#mode']) {
+    calls.length = 0;
+    gesture = true;
+    const target = element(selector);
+    (selector === '#mode' ? target.onchange : target.onclick)();
+    gesture = false;
+    await new Promise((resolve) => setImmediate(resolve));
+    const opened = calls.indexOf('open');
+    const dispatched = calls.findIndex((call) => typeof call === 'object');
+    assert.ok(opened >= 0 && dispatched > opened);
+    if (selector === '#mode') assert.ok(calls.indexOf('save') > opened);
+    assert.equal(calls[dispatched].panelOpened, true);
+  }
+});
+
+test('popup completion never reopens a side panel from the worker', async () => {
+  for (const type of ['show', 'capture-request']) {
+    const context = worker();
+    const response = await context.message(
+      { type, tabId: 7, mode: 'fixed', panelOpened: true, action: 'page' },
+      { id: 'test-id', url: 'chrome-extension://test-id/controls.html' },
+    );
+    assert.equal(response.ok, true);
+    assert.equal(
+      context.calls.some((call) => call[0] === 'open'),
+      false,
+    );
+    assert.ok(context.calls.some((call) => call[0] === 'rules'));
+  }
 });
