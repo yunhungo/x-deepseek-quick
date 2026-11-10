@@ -1,0 +1,310 @@
+/*
+ * @created 2026-11-10
+ * @description 扩展工具栏主题与透明面板视觉令牌
+ * @author yunhungo
+ */
+:root {
+  color-scheme: light dark;
+  --surface: #ffffffa8;
+  --text: #202020;
+  --border: #00000012;
+  --hover: #0000000a;
+  --radius: 8px;
+  --space: 8px;
+  --icon: 30px;
+  --font: 13px;
+  --shadow: 0 4px 20px #0002;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #202020ad;
+    --text: #eee;
+    --border: #ffffff18;
+    --hover: #ffffff12;
+  }
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+  --surface: #ffffffa8;
+  --text: #202020;
+  --border: #00000012;
+  --hover: #0000000a;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface: #202020ad;
+  --text: #eee;
+  --border: #ffffff18;
+  --hover: #ffffff12;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  background: transparent;
+  font: var(--font) system-ui;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space);
+  background: var(--surface);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  touch-action: none;
+}
+header strong {
+  flex: 1;
+  font-size: var(--font);
+  margin-left: 4px;
+}
+button {
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  min-width: var(--icon);
+  height: var(--icon);
+  cursor: pointer;
+  font-size: 20px;
+}
+button:hover {
+  background: var(--hover);
+}
+button:focus-visible {
+  outline: 2px solid #4e6eff;
+  outline-offset: -2px;
+}
+main {
+  flex: 1;
+  min-height: 0;
+  background: var(--surface);
+}
+iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+#notice {
+  position: fixed;
+  bottom: var(--space);
+  left: var(--space);
+  right: var(--space);
+  padding: var(--space);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+}
+#notice[hidden] {
+  display: none;
+}
+#notice span {
+  flex: 1;
+}
+@media (max-width: 360px) {
+  header strong {
+    display: none;
+  }
+  header img {
+    margin-right: auto;
+  }
+}
+
+#theme-menu {
+  --menu-surface: #f9f9f9;
+  position: fixed;
+  z-index: 10;
+  top: 48px;
+  right: 8px;
+  width: 176px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--menu-surface);
+  box-shadow: 0 8px 28px #0003;
+  user-select: none;
+}
+#theme-menu[hidden] {
+  display: none;
+}
+#theme-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  text-align: left;
+}
+#theme-menu .check {
+  visibility: hidden;
+  font-size: 14px;
+}
+#theme-menu [aria-checked='true'] .check {
+  visibility: visible;
+}
+:root[data-theme='dark'] #theme-menu {
+  --menu-surface: #292929;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) #theme-menu {
+    --menu-surface: #292929;
+  }
+}
+
+#toolbar[hidden] {
+  display: none;
+}
+html[data-mode='floating'] main {
+  background: transparent;
+}
+// Every toolbar glyph shares a view box, baseline and hit target.
+.ui-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon);
+  height: var(--icon);
+  padding: 0;
+  flex: 0 0 var(--icon);
+  line-height: 1;
+}
+.icon-button[hidden] {
+  display: none;
+}
+#toolbar {
+  gap: 4px;
+}
+#toolbar img {
+  display: block;
+  flex: 0 0 24px;
+}
+#toolbar strong {
+  line-height: 24px;
+}
+body.controls {
+  --popup-surface: #fafafa;
+  --action-color: #4e6eff;
+  --control-height: 36px;
+  width: 280px;
+  height: auto;
+  padding: 12px;
+  gap: 10px;
+  background: var(--popup-surface);
+}
+:root[data-theme='dark'] body.controls {
+  --popup-surface: #202020;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) body.controls {
+    --popup-surface: #202020;
+  }
+}
+.controls header {
+  padding: 0 0 2px;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+}
+.controls header strong {
+  display: block;
+  margin: 0;
+  font-size: 14px;
+  line-height: 24px;
+}
+.controls header img {
+  margin: 0;
+  display: block;
+}
+.controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: var(--control-height);
+  padding: 0 10px;
+  font: inherit;
+  line-height: 1;
+  border: 1px solid var(--border);
+}
+.controls .primary-action {
+  height: 38px;
+  color: #fff;
+  background: var(--action-color);
+  border-color: transparent;
+  font-weight: 600;
+}
+.controls .primary-action:hover {
+  filter: brightness(1.07);
+}
+.capture-actions {
+  display: flex;
+  gap: 8px;
+}
+.capture-actions button {
+  flex: 1;
+}
+.controls .quiet-action {
+  height: 28px;
+  border-color: transparent;
+  opacity: 0.75;
+}
+.preferences {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.preference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.preference-row + .preference-row {
+  margin-top: 8px;
+}
+.preference-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.preference-row label .ui-icon {
+  opacity: 0.65;
+}
+.controls select {
+  width: 128px;
+  height: 32px;
+  padding: 0 8px;
+  color: var(--text);
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+}
+.controls select:focus-visible {
+  outline: 2px solid var(--action-color);
+  outline-offset: 2px;
+}

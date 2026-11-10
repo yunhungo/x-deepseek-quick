@@ -1,0 +1,70 @@
+{
+  "manifest_version": 3,
+  "name": "DSQuick",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "description": "DeepSeek 悬浮窗、侧栏与网页内容附件",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": ["https://chat.deepseek.com/*"],
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "DSQuick",
+    "default_icon": {
+      "32": "icons/32.png",
+      "128": "icons/128.png"
+    },
+    "default_popup": "controls.html"
+  },
+  "icons": {
+    "32": "icons/32.png",
+    "128": "icons/128.png"
+  },
+  "commands": {
+    "toggle": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D",
+        "mac": "Command+Shift+D"
+      },
+      "description": "显示或隐藏 DSQuick"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": [
+        "login-scope.js",
+        "auth-contract.js",
+        "auth-client.js",
+        "bootstrap.js",
+        "glass.js",
+        "upload.js"
+      ],
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "panel.html",
+        "panel.js",
+        "panel.css",
+        "icons/*",
+        "icons.svg",
+        "appearance.js"
+      ],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://chat.deepseek.com; style-src 'self'"
+  }
+}

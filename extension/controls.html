@@ -1,0 +1,146 @@
+<!doctype html>
+<!--
+ @created 2026-11-10
+ @description 扩展图标弹出的采集与偏好设置
+ @author yunhungo
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>DSQuick</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body class="controls">
+    <header>
+      <img src="icons/32.png" width="24" height="24" alt="" /><strong
+        >DSQuick</strong
+      >
+    </header>
+    <button id="open" class="primary-action">
+      <svg
+        class="ui-icon"
+        aria-hidden="true"
+        width="18"
+        height="18"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <use href="icons.svg#open"></use></svg
+      ><span>打开面板</span>
+    </button>
+    <div class="capture-actions">
+      <button id="select">
+        <svg
+          class="ui-icon"
+          aria-hidden="true"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <use href="icons.svg#target"></use></svg
+        ><span>选择元素</span>
+      </button>
+      <button id="whole">
+        <svg
+          class="ui-icon"
+          aria-hidden="true"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <use href="icons.svg#page"></use></svg
+        ><span>添加整页</span>
+      </button>
+    </div>
+    <button id="cancel" class="quiet-action">
+      <svg
+        class="ui-icon"
+        aria-hidden="true"
+        width="18"
+        height="18"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <use href="icons.svg#cancel"></use></svg
+      ><span>取消选择</span>
+    </button>
+    <section class="preferences" aria-label="偏好设置">
+      <div class="preference-row">
+        <label for="mode"
+          ><svg
+            class="ui-icon"
+            aria-hidden="true"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <use href="icons.svg#open"></use></svg
+          ><span>显示方式</span></label
+        >
+        <select id="mode">
+          <option value="floating">悬浮</option>
+          <option value="fixed">固定侧栏</option>
+        </select>
+      </div>
+      <div class="preference-row">
+        <label for="appearance"
+          ><svg
+            class="ui-icon"
+            aria-hidden="true"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <use href="icons.svg#theme"></use></svg
+          ><span>外观</span></label
+        >
+        <select id="appearance">
+          <option value="system">跟随系统</option>
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
+        </select>
+      </div>
+    </section>
+    <div id="notice" role="status" hidden>
+      <span></span
+      ><button class="icon-button" aria-label="关闭提示">
+        <svg
+          class="ui-icon"
+          aria-hidden="true"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <use href="icons.svg#close"></use>
+        </svg>
+      </button>
+    </div>
+    <script type="module" src="controls.js"></script>
+  </body>
+</html>

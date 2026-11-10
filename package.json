@@ -9,10 +9,12 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:adapter": "node --test scripts/tests/glass-policy.test.mjs",
-    "package:mac": "tauri bundle --bundles app && python3 -B scripts/package-macos.py"
+    "package:mac": "tauri bundle --bundles app && python3 -B scripts/package-macos.py",
+    "build:extension": "node scripts/build-extension.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "sass": "^1.108.1",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
   }

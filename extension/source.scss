@@ -1,0 +1,57 @@
+/*
+ * @created 2026-11-10
+ * @description 悬浮层与元素高亮的隔离样式
+ * @author yunhungo
+ */
+:host {
+  all: initial;
+}
+.mark {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid #4e6eff;
+  background: #4e6eff18;
+  border-radius: 5px;
+  z-index: 2147483647;
+  box-sizing: border-box;
+}
+.hint {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #202020;
+  color: white;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: 13px system-ui;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+.floating {
+  position: fixed;
+  left: 24px;
+  top: 72px;
+  width: min(460px, calc(100vw - 32px));
+  height: min(700px, calc(100vh - 96px));
+  min-width: 300px;
+  min-height: 280px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  resize: both;
+  overflow: hidden;
+  border: 1px solid #8884;
+  border-radius: 20px;
+  background: #80808018;
+  backdrop-filter: blur(28px);
+  box-shadow: 0 12px 40px #0004;
+  z-index: 2147483646;
+}
+.floating[hidden] {
+  display: none;
+}
+iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}

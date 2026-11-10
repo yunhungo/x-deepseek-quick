@@ -6,6 +6,7 @@
 (function (root, factory) {
   const adapter = factory();
   if (typeof module === 'object' && module.exports) module.exports = adapter;
+  else if (typeof root.__DSQUICK_REGISTER_ADAPTER__ === 'function') root.__DSQUICK_REGISTER_ADAPTER__(adapter);
   else adapter.install(root);
 })(globalThis, function () {
   const POLICY = Object.freeze({
@@ -87,7 +88,7 @@
     if (!cfg) return;
     const hosts = new Set((cfg.allowedHosts || []).map((host) => String(host).toLowerCase()));
     if (!hosts.has(w.location.hostname)) return;
-    const disposeIme = /Mac/.test(w.navigator.platform) && /AppleWebKit/.test(w.navigator.userAgent)
+    const disposeIme = cfg.imeConfirmation !== false && /Mac/.test(w.navigator.platform) && /AppleWebKit/.test(w.navigator.userAgent)
       ? installImeConfirmation(w) : () => {};
     let observer;
     let disposed = false;
