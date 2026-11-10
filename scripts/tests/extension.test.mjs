@@ -902,3 +902,54 @@ test('browser property ordering does not cause rules to be repeatedly replaced',
     before,
   );
 });
+
+test('manifest exposes invocation, local selection and whole-page text commands', async () => {
+  const manifest = JSON.parse(
+    await readFile(
+      new URL('../../extension/manifest.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  assert.deepEqual(Object.keys(manifest.commands).sort(), [
+    'capture-page',
+    'capture-selection',
+    'toggle',
+  ]);
+  assert.equal(manifest.commands.toggle.suggested_key.mac, 'Command+Shift+D');
+  assert.equal(manifest.commands['capture-selection'].suggested_key, undefined);
+  assert.equal(manifest.commands['capture-page'].suggested_key, undefined);
+});
+test('capture shortcuts queue the existing actions and open without toggling the panel closed', async () => {
+  for (const [command, action] of [
+    ['capture-selection', 'pick'],
+    ['capture-page', 'page'],
+  ]) {
+    const context = worker();
+    await context.handlers.command(command, {
+      id: 7,
+      windowId: 3,
+      url: 'https://example.com/',
+    });
+    assert.equal(context.state['capture:7'].action, action);
+    assert.equal(context.state['capture:7'].mode, 'floating');
+    const show = context.calls.find(
+      (call) => call[0] === 'send' && call[2].type === 'show-floating',
+    );
+    assert.equal(show[2].toggle, false);
+  }
+});
+test('popup capture and shortcut capture use the same queue contract', async () => {
+  const context = worker();
+  const controls = {
+    id: 'test-id',
+    url: 'chrome-extension://test-id/controls.html',
+  };
+  const response = await context.message(
+    { type: 'capture-request', tabId: 7, action: 'page', mode: 'fixed' },
+    controls,
+  );
+  assert.equal(response.ok, true);
+  assert.equal(context.state['capture:7'].action, 'page');
+  assert.equal(context.state['capture:7'].mode, 'fixed');
+  assert.ok(context.calls.some((call) => call[0] === 'open'));
+});

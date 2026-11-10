@@ -258,6 +258,15 @@ window.addEventListener('message', (event) => {
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (
     sender.id === chrome.runtime.id &&
+    sender.url === chrome.runtime.getURL('worker.js') &&
+    message.type === 'command-error' &&
+    message.tabId === sourceTab
+  ) {
+    notify('无法执行快捷键，请在网页中重试');
+    return;
+  }
+  if (
+    sender.id === chrome.runtime.id &&
     sender.url === chrome.runtime.getURL('controls.html') &&
     message.tabId === sourceTab
   ) {

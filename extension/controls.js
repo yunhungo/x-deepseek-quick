@@ -56,14 +56,13 @@ theme.onchange = () =>
   });
 document.querySelector('#open').onclick = () => act(show);
 async function capture(action) {
-  await chrome.storage.session.set({
-    [`capture:${tab.id}`]: {
-      action,
-      mode: mode.value,
-      id: crypto.randomUUID(),
-    },
+  const result = await chrome.runtime.sendMessage({
+    type: 'capture-request',
+    tabId: tab.id,
+    action,
+    mode: mode.value,
   });
-  await show();
+  if (!result?.ok) throw new Error(result?.error || '无法采集网页');
 }
 document.querySelector('#select').onclick = () => act(() => capture('pick'));
 document.querySelector('#whole').onclick = () => act(() => capture('page'));

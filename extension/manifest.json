@@ -34,7 +34,13 @@
         "default": "Ctrl+Shift+D",
         "mac": "Command+Shift+D"
       },
-      "description": "显示或隐藏 DSQuick"
+      "description": "唤起 DSQuick"
+    },
+    "capture-selection": {
+      "description": "局部选择网页元素并添加附件"
+    },
+    "capture-page": {
+      "description": "提取整页内容并添加文本附件"
     }
   },
   "content_scripts": [

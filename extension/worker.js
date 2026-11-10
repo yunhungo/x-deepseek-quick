@@ -245,10 +245,37 @@ async function activate(tab, mode = preferredMode, toggle = false) {
     toggle,
   });
 }
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== 'toggle') return;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  await activate(tab, preferredMode, true).catch(console.error);
+async function openCapture(tab, action, mode = preferredMode) {
+  if (!tab?.id || !/^https?:/.test(tab.url || ''))
+    throw new Error('请先打开网页');
+  const key = `capture:${tab.id}`;
+  const task = { action, mode, id: crypto.randomUUID() };
+  // Start opening synchronously so Chrome retains the shortcut's user gesture.
+  // New panels read the task on startup; existing panels observe its update.
+  const opening = activate(tab, mode);
+  try {
+    await Promise.all([opening, chrome.storage.session.set({ [key]: task })]);
+  } catch (error) {
+    const saved = await chrome.storage.session.get(key);
+    if (saved[key]?.id === task.id) await chrome.storage.session.remove(key);
+    throw error;
+  }
+}
+chrome.commands.onCommand.addListener(async (command, eventTab) => {
+  if (!['toggle', 'capture-selection', 'capture-page'].includes(command))
+    return;
+  const tab =
+    eventTab ||
+    (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+  try {
+    if (command === 'toggle') await activate(tab, preferredMode, true);
+    else
+      await openCapture(tab, command === 'capture-selection' ? 'pick' : 'page');
+  } catch {
+    chrome.runtime
+      .sendMessage({ type: 'command-error', tabId: tab?.id })
+      .catch(() => {});
+  }
 });
 const trustedPanel = (sender) =>
   sender.id === chrome.runtime.id &&
@@ -338,6 +365,16 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (!Number.isInteger(tabId) || tabId <= 0)
       throw new Error('请在目标网页点击 DSQuick 图标');
     const tab = await chrome.tabs.get(tabId);
+    if (message.type === 'capture-request' && controls) {
+      if (!['pick', 'page'].includes(message.action))
+        throw new Error('无效的采集操作');
+      await openCapture(
+        tab,
+        message.action,
+        message.mode === 'fixed' ? 'fixed' : 'floating',
+      );
+      return {};
+    }
     if (message.type === 'show') {
       await activate(tab, message.mode === 'fixed' ? 'fixed' : 'floating');
       return {};
