@@ -123,3 +123,9 @@ if (new URLSearchParams(location.search).has('diagnostics')) {
     });
   document.querySelector('.preferences').after(button);
 }
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.theme) return;
+  theme.value = normalizeTheme(changes.theme.newValue);
+  applyTheme();
+});

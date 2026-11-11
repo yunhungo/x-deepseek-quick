@@ -18,6 +18,8 @@
   box.hidden = true;
   const frame = document.createElement('iframe');
   frame.title = 'DSQuick';
+  // Keep media queries independent of the last explicit panel theme.
+  frame.style.setProperty('color-scheme', 'light dark', 'important');
   box.append(frame);
   shadow.append(box);
   let focusTimer;
@@ -284,7 +286,7 @@
       message.type === 'frame-scheme' &&
       ['light', 'dark'].includes(message.scheme)
     )
-      frame.style.colorScheme = message.scheme;
+      frame.style.setProperty('color-scheme', 'light dark', 'important');
     if (message.type === 'restore') box.style.visibility = '';
     if (message.type === 'cancel-pick') stop();
     if (message.type === 'move-floating') {

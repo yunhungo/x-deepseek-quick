@@ -21,7 +21,10 @@ function configureGlass() {
   chat.contentWindow.postMessage(
     {
       type: 'dsquick-configure',
-      scheme: resolveScheme(theme, matchMedia('(prefers-color-scheme: dark)').matches),
+      scheme: resolveScheme(
+        theme,
+        matchMedia('(prefers-color-scheme: dark)').matches,
+      ),
     },
     'https://chat.deepseek.com',
   );
@@ -77,13 +80,6 @@ const themeOptions = [...themeMenu.querySelectorAll('button')];
 function applyTheme() {
   applyAppearance(theme);
   configureGlass();
-  if (floating)
-    request('frame-scheme', {
-      scheme: resolveScheme(
-        theme,
-        matchMedia('(prefers-color-scheme: dark)').matches,
-      ),
-    }).catch(() => {});
   themeButton.title = `外观：${labels[theme]}`;
   themeButton.setAttribute('aria-label', themeButton.title);
   for (const option of themeOptions) {

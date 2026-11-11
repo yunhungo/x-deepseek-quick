@@ -1052,6 +1052,10 @@ test('popup opens fixed panels inside the click before settings or worker messag
     setTimeout,
     clearTimeout,
   });
+  appearanceChanged({ theme: { newValue: 'dark' } }, 'local');
+  assert.equal(element('#appearance').value, 'dark');
+  appearanceChanged({ theme: { newValue: 'system' } }, 'local');
+  assert.equal(element('#appearance').value, 'system');
   for (const selector of ['#open', '#select', '#whole', '#mode']) {
     calls.length = 0;
     gesture = true;
@@ -1210,6 +1214,12 @@ test('embedded website switches both ways only for trusted panel theme messages'
   }
   send('invalid');
   assert.equal(root.dataset.theme, 'dark');
+});
+
+test('floating iframe keeps system media queries independent of explicit themes', () => {
+  const context = sourceContext();
+  const frame = context.box.children[0];
+  assert.equal(frame.style['color-scheme'], 'light dark');
 });
 
 test('read-only article editor text is captured while editable drafts are excluded', () => {
