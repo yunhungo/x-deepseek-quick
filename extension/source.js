@@ -111,7 +111,7 @@
   hint.className = 'hint';
   hint.textContent = '点击添加此元素及其内容 · Esc 取消';
   const blocked =
-    'script,style,noscript,template,input,textarea,select,[contenteditable],[hidden],[aria-hidden="true"]';
+    'script,style,noscript,template,input,textarea,select,[hidden],[aria-hidden="true"]';
   function visible(element) {
     const css = getComputedStyle(element);
     return (
@@ -145,6 +145,7 @@
         !(node instanceof Element) ||
         node === host ||
         node.matches(blocked) ||
+        node.isContentEditable ||
         !visible(node)
       )
         return;
@@ -307,9 +308,10 @@
     if (message.type === 'page') {
       const root =
         document.querySelector('main,[role="main"],article') || document.body;
-      chrome.runtime
-        .sendMessage({ type: 'capture', payload: snapshot(root) })
-        .catch(() => {});
+      const payload = snapshot(root);
+      if (message.fallback)
+        payload.text = '[原生无障碍读取不可用，回退 DOM 提取]\n' + payload.text;
+      chrome.runtime.sendMessage({ type: 'capture', payload }).catch(() => {});
     }
     reply({});
   });

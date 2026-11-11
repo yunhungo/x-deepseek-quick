@@ -5,6 +5,7 @@
   "minimum_chrome_version": "116",
   "description": "DeepSeek 悬浮窗、侧栏与网页内容附件",
   "permissions": [
+    "debugger",
     "activeTab",
     "scripting",
     "storage",

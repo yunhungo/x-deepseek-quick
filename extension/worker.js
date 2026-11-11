@@ -10,6 +10,7 @@ import {
   validVault,
 } from './auth-session.js';
 import { openFixedPanel } from './panel-opening.js';
+import { captureAccessibility, readPageSelection } from './accessibility.js';
 
 // Serialize preparation so parallel panels cannot replace one another's rules.
 let embedQueue = Promise.resolve();
@@ -392,6 +393,31 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
         controls && message.panelOpened === true,
       );
       return {};
+    }
+    if (['pick', 'page'].includes(message.type) && trustedPanel(sender)) {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: readPageSelection,
+      });
+      const text = results?.[0]?.result;
+      if (typeof text === 'string' && text.trim()) {
+        if (text.length > 180000) throw new Error('选中文字过多，请缩小范围');
+        return { payload: { text, images: [], truncated: false } };
+      }
+    }
+    if (message.type === 'page' && trustedPanel(sender)) {
+      try {
+        return { payload: await captureAccessibility(chrome, tab) };
+      } catch {
+        // DOM extraction remains available when DevTools owns the debugger,
+        // permission is withheld, or the website exposes no readable AX text.
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['source.js'],
+        });
+        await chrome.tabs.sendMessage(tabId, { type: 'page', fallback: true });
+        return { fallback: true };
+      }
     }
     if (message.type === 'source') return { tabId };
     if (message.type === 'screenshot') {

@@ -11,6 +11,7 @@ for (const file of [
   'manifest.json',
   'bootstrap.js',
   'worker.js',
+  'accessibility.js',
   'panel.html',
   'panel.js',
   'upload.js',

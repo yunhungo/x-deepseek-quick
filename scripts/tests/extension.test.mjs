@@ -8,17 +8,19 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 const panelOpening = await import('../../extension/panel-opening.js');
+const accessibility = await import('../../extension/accessibility.js');
 const authContract = await import('../../extension/auth-session.js');
 const workerSource = (
   await readFile(new URL('../../extension/worker.js', import.meta.url), 'utf8')
 )
   .replace(/^import[\s\S]*?from '\.\/auth-session\.js';\s*/m, '')
-  .replace(/^import .*panel-opening.js';\s*/m, '');
+  .replace(/^import .*panel-opening.js';\s*/m, '')
+  .replace(/^import\s*\{[\s\S]*?\}\s*from '\.\/accessibility\.js';\s*/m, '');
 const uploadSource = await readFile(
   new URL('../../extension/upload.js', import.meta.url),
   'utf8',
 );
-function worker() {
+function worker(selectedText = '') {
   const handlers = {},
     calls = [];
   const state = { windowsByTab: {} };
@@ -99,6 +101,7 @@ function worker() {
     scripting: {
       executeScript: async (options) => {
         calls.push(['inject', options]);
+        return [{ result: selectedText }];
       },
     },
     sidePanel: {
@@ -125,6 +128,7 @@ function worker() {
     crypto,
     ...authContract,
     ...panelOpening,
+    ...accessibility,
   });
   const message = (body, sender) =>
     new Promise((resolve) => handlers.message(body, sender, resolve));
@@ -284,7 +288,11 @@ function sourceContext() {
   const listeners = new Map();
   let receive;
   class FakeElement {
-    style = {};
+    style = {
+      setProperty(name, value) {
+        this[name] = value;
+      },
+    };
     dataset = {};
     attributes = new Map();
     children = [];
@@ -998,9 +1006,15 @@ test('popup opens fixed panels inside the click before settings or worker messag
   };
   const calls = [];
   let gesture = false;
+  let appearanceChanged;
   const chrome = {
     tabs: { query: async () => [{ id: 7, url: 'https://example.com/' }] },
     storage: {
+      onChanged: {
+        addListener(fn) {
+          appearanceChanged = fn;
+        },
+      },
       local: {
         get: async () => ({ mode: 'fixed', theme: 'system' }),
         set: async () => {
@@ -1153,7 +1167,8 @@ test('embedded website switches both ways only for trusted panel theme messages'
     return {
       dataset: {},
       classList: {
-        toggle: (name, enabled) => enabled ? tokens.add(name) : tokens.delete(name),
+        toggle: (name, enabled) =>
+          enabled ? tokens.add(name) : tokens.delete(name),
         contains: (name) => tokens.has(name),
       },
       style: {
@@ -1166,14 +1181,22 @@ test('embedded website switches both ways only for trusted panel theme messages'
   const body = element();
   const context = vm.createContext({
     parent,
-    window: { top: {}, addEventListener: (type, fn) => { handlers[type] = fn; } },
+    window: {
+      top: {},
+      addEventListener: (type, fn) => {
+        handlers[type] = fn;
+      },
+    },
     document: { documentElement: root, body },
     chrome: { runtime: { getURL: () => 'chrome-extension://test-id/' } },
   });
   vm.runInContext(bootstrapScript, context);
-  const send = (scheme, origin = 'chrome-extension://test-id') => handlers.message({
-    source: parent, origin, data: { type: 'dsquick-configure', scheme },
-  });
+  const send = (scheme, origin = 'chrome-extension://test-id') =>
+    handlers.message({
+      source: parent,
+      origin,
+      data: { type: 'dsquick-configure', scheme },
+    });
   send('dark', 'https://untrusted.example');
   assert.equal(root.dataset.theme, undefined);
   for (const scheme of ['dark', 'light', 'dark']) {
@@ -1187,4 +1210,61 @@ test('embedded website switches both ways only for trusted panel theme messages'
   }
   send('invalid');
   assert.equal(root.dataset.theme, 'dark');
+});
+
+test('read-only article editor text is captured while editable drafts are excluded', () => {
+  class Element {
+    constructor(tag, children = [], editable = false) {
+      this.tagName = tag;
+      this.childNodes = children;
+      this.isContentEditable = editable;
+    }
+    matches() {
+      return false;
+    }
+    getClientRects() {
+      return [1];
+    }
+    getAttribute() {
+      return null;
+    }
+  }
+  const text = (value) => ({ nodeType: 3, textContent: value });
+  const root = new Element('ARTICLE', [
+    new Element('DIV', [text('Published X article body')], false),
+    new Element('DIV', [text('Unsent private draft')], true),
+  ]);
+  const functionSource = sourceScript.slice(
+    sourceScript.indexOf('  function snapshot(root)'),
+    sourceScript.indexOf('  function stop()'),
+  );
+  const payload = vm.runInNewContext(`${functionSource}; snapshot(root)`, {
+    root,
+    Element,
+    Node: { TEXT_NODE: 3 },
+    host: {},
+    blocked: 'input,textarea,select',
+    visible: () => true,
+    document: { title: 'Article', body: root },
+    location: { href: 'https://x.com/example/article/1' },
+  });
+  assert.match(payload.text, /Published X article body/);
+  assert.doesNotMatch(payload.text, /Unsent private draft/);
+});
+
+test('existing page selection bypasses both picking and full-page capture', async () => {
+  for (const type of ['pick', 'page']) {
+    const context = worker('Selected article passage');
+    const response = await context.message({ type }, panel);
+    assert.equal(response.ok, true);
+    assert.equal(response.payload.text, 'Selected article passage');
+    assert.equal(
+      context.calls.filter((call) => call[0] === 'inject').length,
+      1,
+    );
+    assert.equal(
+      context.calls.some((call) => call[0] === 'send'),
+      false,
+    );
+  }
 });

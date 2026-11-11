@@ -164,7 +164,19 @@ async function capture(type) {
     await request('source');
     requesting = true;
     selecting = type === 'pick';
-    await request(type);
+    const result = await request(type);
+    if (result.payload) {
+      requesting = false;
+      selecting = false;
+      const id = crypto.randomUUID();
+      pending.push({
+        id,
+        files: [
+          { name: `${id}.txt`, type: 'text/plain', text: result.payload.text },
+        ],
+      });
+      await deliver();
+    }
   });
 }
 document.querySelector('#pin').hidden = true;
