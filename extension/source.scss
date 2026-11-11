@@ -67,10 +67,10 @@
   transition: opacity var(--dsq-fade-duration) var(--dsq-fade-easing);
 }
 .floating[data-inactive='true'] {
-  --dsq-content-opacity: 0.12;
-  --dsq-backdrop-opacity: 0.08;
+  --dsq-content-opacity: 0.015;
+  --dsq-backdrop-opacity: 0;
   --dsq-border: #8889;
-  --dsq-shadow: 0 4px 16px #0001;
+  --dsq-shadow: 0 12px 40px #0000;
 }
 .floating[hidden] {
   display: none;
