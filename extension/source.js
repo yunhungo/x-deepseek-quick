@@ -71,38 +71,81 @@
     }, 0);
   });
   let saveBoundsTimer;
+  let defaultLayout = true;
+  let boundsTouched = false;
+  function applyBounds(bounds) {
+    const width = Math.max(
+      Math.min(300, innerWidth),
+      Math.min(innerWidth, bounds.width),
+    );
+    const height = Math.max(
+      Math.min(280, innerHeight),
+      Math.min(innerHeight, bounds.height),
+    );
+    Object.assign(box.style, {
+      left: `${Math.max(0, Math.min(innerWidth - width, bounds.left))}px`,
+      top: `${Math.max(0, Math.min(innerHeight - height, bounds.top))}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+    });
+  }
   chrome.storage.local
     .get('floatingBounds')
     .then(({ floatingBounds: bounds }) => {
       if (
+        boundsTouched ||
         !bounds ||
         !['left', 'top', 'width', 'height'].every((key) =>
           Number.isFinite(bounds[key]),
         )
       )
         return;
-      box.style.left = `${Math.max(0, Math.min(innerWidth - 80, bounds.left))}px`;
-      box.style.top = `${Math.max(0, Math.min(innerHeight - 48, bounds.top))}px`;
-      box.style.width = `${Math.max(300, Math.min(innerWidth - 32, bounds.width))}px`;
-      box.style.height = `${Math.max(280, Math.min(innerHeight - 32, bounds.height))}px`;
+      defaultLayout = false;
+      applyBounds(bounds);
     });
   function saveBounds() {
     clearTimeout(saveBoundsTimer);
     saveBoundsTimer = setTimeout(() => {
       if (box.hidden) return;
       const bounds = box.getBoundingClientRect();
+      if (
+        defaultLayout &&
+        (Math.abs(bounds.width - Math.min(460, innerWidth)) > 1 ||
+          Math.abs(bounds.height - innerHeight) > 1)
+      ) {
+        defaultLayout = false;
+        boundsTouched = true;
+      }
+      // Default mode stays responsive across viewport sizes and future openings.
       chrome.storage.local.set({
-        floatingBounds: {
-          left: bounds.left,
-          top: bounds.top,
-          width: bounds.width,
-          height: bounds.height,
-        },
+        floatingBounds: defaultLayout
+          ? null
+          : {
+              left: bounds.left,
+              top: bounds.top,
+              width: bounds.width,
+              height: bounds.height,
+            },
       });
     }, 250);
   }
+  function resetBounds() {
+    boundsTouched = true;
+    defaultLayout = true;
+    clearTimeout(saveBoundsTimer);
+    for (const property of ['left', 'top', 'width', 'height'])
+      box.style.removeProperty(property);
+    setInactive(false);
+    return chrome.storage.local.set({ floatingBounds: null });
+  }
   const boundsObserver = new ResizeObserver(saveBounds);
   boundsObserver.observe(box);
+  window.addEventListener('resize', () => {
+    if (!defaultLayout && !box.hidden) {
+      applyBounds(box.getBoundingClientRect());
+      saveBounds();
+    }
+  });
   let selecting = false,
     target,
     pointer,
@@ -276,7 +319,10 @@
           `panel.html?floating=1&source=${message.tabId}`,
         );
       box.hidden = message.toggle ? !box.hidden : false;
-      if (!box.hidden) setInactive(false);
+      if (!box.hidden) {
+        if (!defaultLayout) applyBounds(box.getBoundingClientRect());
+        setInactive(false);
+      }
     }
     if (message.type === 'hide-floating') {
       stop();
@@ -289,10 +335,23 @@
       frame.style.setProperty('color-scheme', 'light dark', 'important');
     if (message.type === 'restore') box.style.visibility = '';
     if (message.type === 'cancel-pick') stop();
+    if (message.type === 'reset-floating') {
+      resetBounds().then(
+        () => reply({}),
+        () => reply({ ok: false, error: '无法保存默认窗口大小，请重试' }),
+      );
+      return true;
+    }
     if (message.type === 'move-floating') {
+      boundsTouched = true;
+      defaultLayout = false;
       const bounds = box.getBoundingClientRect();
-      box.style.left = `${Math.max(0, Math.min(innerWidth - bounds.width, bounds.left + (message.dx || 0)))}px`;
-      box.style.top = `${Math.max(0, Math.min(innerHeight - 48, bounds.top + (message.dy || 0)))}px`;
+      applyBounds({
+        left: bounds.left + (Number.isFinite(message.dx) ? message.dx : 0),
+        top: bounds.top + (Number.isFinite(message.dy) ? message.dy : 0),
+        width: bounds.width,
+        height: bounds.height,
+      });
       saveBounds();
     }
     if (message.type === 'pick') {

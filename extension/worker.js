@@ -440,6 +440,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
         'hide-floating',
         'restore',
         'move-floating',
+        'reset-floating',
         'frame-scheme',
       ].includes(message.type)
     )

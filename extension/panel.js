@@ -199,6 +199,12 @@ window.addEventListener('message', (event) => {
 });
 let pointer;
 const toolbar = document.querySelector('#toolbar');
+toolbar.addEventListener('dblclick', (event) => {
+  if (!floating || event.target.closest('button,a,input,select,img')) return;
+  event.preventDefault();
+  pointer = undefined;
+  act(() => request('reset-floating'));
+});
 toolbar.addEventListener('pointerdown', (event) => {
   if (!floating || event.target.closest('button')) return;
   pointer = { x: event.screenX, y: event.screenY };
