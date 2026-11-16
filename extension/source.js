@@ -70,31 +70,53 @@
       if (!box.hidden && !selecting && !document.hasFocus()) setInactive(true);
     }, 0);
   });
+  const LAYOUT_VERSION = 2;
   let saveBoundsTimer;
   let defaultLayout = true;
   let boundsTouched = false;
+  let resizeStart;
+  function viewportBounds() {
+    const viewport = window.visualViewport;
+    return {
+      left: Number.isFinite(viewport?.offsetLeft) ? viewport.offsetLeft : 0,
+      top: Number.isFinite(viewport?.offsetTop) ? viewport.offsetTop : 0,
+      width: viewport?.width > 0 ? viewport.width : innerWidth,
+      height: viewport?.height > 0 ? viewport.height : innerHeight,
+    };
+  }
   function applyBounds(bounds) {
+    const viewport = viewportBounds();
     const width = Math.max(
-      Math.min(300, innerWidth),
-      Math.min(innerWidth, bounds.width),
+      Math.min(300, viewport.width),
+      Math.min(viewport.width, bounds.width),
     );
     const height = Math.max(
-      Math.min(280, innerHeight),
-      Math.min(innerHeight, bounds.height),
+      Math.min(280, viewport.height),
+      Math.min(viewport.height, bounds.height),
     );
     Object.assign(box.style, {
-      left: `${Math.max(0, Math.min(innerWidth - width, bounds.left))}px`,
-      top: `${Math.max(0, Math.min(innerHeight - height, bounds.top))}px`,
+      left: `${Math.max(viewport.left, Math.min(viewport.left + viewport.width - width, bounds.left))}px`,
+      top: `${Math.max(viewport.top, Math.min(viewport.top + viewport.height - height, bounds.top))}px`,
       width: `${width}px`,
       height: `${height}px`,
     });
   }
+  function syncViewport() {
+    const viewport = viewportBounds();
+    for (const key of ['left', 'top', 'width', 'height'])
+      box.style.setProperty(`--dsq-viewport-${key}`, `${viewport[key]}px`);
+    if (!defaultLayout && !box.hidden) applyBounds(box.getBoundingClientRect());
+  }
+  syncViewport();
   chrome.storage.local
     .get('floatingBounds')
     .then(({ floatingBounds: bounds }) => {
+      if (boundsTouched || !bounds) return;
+      // Legacy rectangles may be automatic viewport snapshots, not user resizing.
+      // Migrate them once so the new full-height default actually takes effect.
+      if (bounds.version !== LAYOUT_VERSION)
+        return chrome.storage.local.set({ floatingBounds: null });
       if (
-        boundsTouched ||
-        !bounds ||
         !['left', 'top', 'width', 'height'].every((key) =>
           Number.isFinite(bounds[key]),
         )
@@ -102,50 +124,95 @@
         return;
       defaultLayout = false;
       applyBounds(bounds);
-    });
+    })
+    .catch(() => {});
   function saveBounds() {
     clearTimeout(saveBoundsTimer);
     saveBoundsTimer = setTimeout(() => {
       if (box.hidden) return;
       const bounds = box.getBoundingClientRect();
-      if (
-        defaultLayout &&
-        (Math.abs(bounds.width - Math.min(460, innerWidth)) > 1 ||
-          Math.abs(bounds.height - innerHeight) > 1)
-      ) {
-        defaultLayout = false;
-        boundsTouched = true;
-      }
-      // Default mode stays responsive across viewport sizes and future openings.
-      chrome.storage.local.set({
-        floatingBounds: defaultLayout
-          ? null
-          : {
-              left: bounds.left,
-              top: bounds.top,
-              width: bounds.width,
-              height: bounds.height,
-            },
-      });
+      chrome.storage.local
+        .set({
+          floatingBounds: defaultLayout
+            ? null
+            : {
+                version: LAYOUT_VERSION,
+                left: bounds.left,
+                top: bounds.top,
+                width: bounds.width,
+                height: bounds.height,
+              },
+        })
+        .catch(() => {});
     }, 250);
+  }
+  function rememberUserResize() {
+    if (!resizeStart || box.hidden) return;
+    const bounds = box.getBoundingClientRect();
+    if (
+      Math.abs(bounds.width - resizeStart.width) > 1 ||
+      Math.abs(bounds.height - resizeStart.height) > 1
+    ) {
+      defaultLayout = false;
+      boundsTouched = true;
+    }
   }
   function resetBounds() {
     boundsTouched = true;
     defaultLayout = true;
+    resizeStart = undefined;
     clearTimeout(saveBoundsTimer);
     for (const property of ['left', 'top', 'width', 'height'])
       box.style.removeProperty(property);
+    syncViewport();
     setInactive(false);
     return chrome.storage.local.set({ floatingBounds: null });
   }
-  const boundsObserver = new ResizeObserver(saveBounds);
-  boundsObserver.observe(box);
-  window.addEventListener('resize', () => {
-    if (!defaultLayout && !box.hidden) {
-      applyBounds(box.getBoundingClientRect());
-      saveBounds();
-    }
+  const boundsObserver = new ResizeObserver(() => {
+    rememberUserResize();
+    saveBounds();
   });
+  boundsObserver.observe(box);
+  window.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (
+        box.hidden ||
+        selecting ||
+        (event.button ?? 0) !== 0 ||
+        !insidePanel(event)
+      )
+        return;
+      const bounds = box.getBoundingClientRect();
+      const right = bounds.left + bounds.width;
+      const bottom = bounds.top + bounds.height;
+      if (
+        event.clientX >= right - 18 &&
+        event.clientX <= right &&
+        event.clientY >= bottom - 18 &&
+        event.clientY <= bottom
+      )
+        resizeStart = bounds;
+    },
+    true,
+  );
+  for (const type of ['pointerup', 'pointercancel']) {
+    window.addEventListener(
+      type,
+      () => {
+        rememberUserResize();
+        resizeStart = undefined;
+      },
+      true,
+    );
+  }
+  function viewportChanged() {
+    syncViewport();
+    saveBounds();
+  }
+  window.addEventListener('resize', viewportChanged);
+  window.visualViewport?.addEventListener('resize', viewportChanged);
+  window.visualViewport?.addEventListener('scroll', viewportChanged);
   let selecting = false,
     target,
     pointer,
@@ -172,10 +239,16 @@
       size = 0,
       truncated = false;
     function emit(text) {
-      if (text && size < 180000) {
-        lines.push(text);
-        size += text.length;
-      } else if (size >= 180000) truncated = true;
+      if (!text) return;
+      const remaining = 180000 - size;
+      if (remaining <= 0) {
+        truncated = true;
+        return;
+      }
+      const part = text.slice(0, remaining);
+      lines.push(part);
+      size += part.length;
+      if (part.length < text.length) truncated = true;
     }
     function walk(node, depth) {
       if (++visited > 12000 || depth > 60 || size >= 180000) {
@@ -320,7 +393,7 @@
         );
       box.hidden = message.toggle ? !box.hidden : false;
       if (!box.hidden) {
-        if (!defaultLayout) applyBounds(box.getBoundingClientRect());
+        syncViewport();
         setInactive(false);
       }
     }
@@ -370,8 +443,6 @@
       const root =
         document.querySelector('main,[role="main"],article') || document.body;
       const payload = snapshot(root);
-      if (message.fallback)
-        payload.text = '[原生无障碍读取不可用，回退 DOM 提取]\n' + payload.text;
       chrome.runtime.sendMessage({ type: 'capture', payload }).catch(() => {});
     }
     reply({});

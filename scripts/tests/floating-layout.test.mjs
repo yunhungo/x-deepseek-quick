@@ -12,7 +12,7 @@ const source = await readFile(
   new URL('../../extension/source.js', import.meta.url),
   'utf8',
 );
-function layout({ saved, deferred = false } = {}) {
+function layout({ saved, deferred = false, visual } = {}) {
   const viewport = { width: 1200, height: 800 };
   const listeners = new Map();
   const timers = new Map();
@@ -49,15 +49,25 @@ function layout({ saved, deferred = false } = {}) {
     remove() {}
     getBoundingClientRect() {
       return {
-        left: Number.parseFloat(this.style.left) || 0,
-        top: Number.parseFloat(this.style.top) || 0,
+        left:
+          Number.parseFloat(
+            this.style.left ?? this.style['--dsq-viewport-left'],
+          ) || 0,
+        top:
+          Number.parseFloat(
+            this.style.top ?? this.style['--dsq-viewport-top'],
+          ) || 0,
         width: Math.min(
           Number.parseFloat(this.style.width) || 460,
-          viewport.width,
+          Number.parseFloat(this.style['--dsq-viewport-width']) ||
+            viewport.width,
         ),
         height: Math.min(
-          Number.parseFloat(this.style.height) || viewport.height,
-          viewport.height,
+          Number.parseFloat(this.style.height) ||
+            Number.parseFloat(this.style['--dsq-viewport-height']) ||
+            viewport.height,
+          Number.parseFloat(this.style['--dsq-viewport-height']) ||
+            viewport.height,
         ),
       };
     }
@@ -115,6 +125,14 @@ function layout({ saved, deferred = false } = {}) {
     },
     cancelAnimationFrame() {},
   };
+  const visualListeners = new Map();
+  if (visual)
+    context.window.visualViewport = {
+      ...visual,
+      addEventListener(type, callback) {
+        visualListeners.set(type, callback);
+      },
+    };
   vm.createContext(context);
   vm.runInContext(source, context);
   const box = root.children[0].shadow.children.find(
@@ -123,6 +141,25 @@ function layout({ saved, deferred = false } = {}) {
   return {
     box,
     writes,
+    beginResize() {
+      const bounds = box.getBoundingClientRect();
+      const event = {
+        target: root.children[0],
+        button: 0,
+        clientX: bounds.left + bounds.width - 2,
+        clientY: bounds.top + bounds.height - 2,
+      };
+      for (const callback of listeners.get('pointerdown') || [])
+        callback(event);
+    },
+    endResize() {
+      for (const callback of listeners.get('pointerup') || []) callback({});
+    },
+    resizeVisualViewport(values) {
+      Object.assign(context.window.visualViewport, values);
+      visualListeners.get('resize')();
+      resize();
+    },
     message(type, extra = {}) {
       return new Promise((reply) =>
         receive({ type, ...extra }, { id: 'test-id' }, reply),
@@ -167,7 +204,7 @@ test('default layout remains full-height as the viewport changes instead of stor
 
 test('saved custom dimensions fit the current viewport without leaving the title bar offscreen', async () => {
   const state = layout({
-    saved: { left: 1100, top: 750, width: 600, height: 500 },
+    saved: { version: 2, left: 1100, top: 750, width: 600, height: 500 },
   });
   await state.message('show-floating');
   assert.deepEqual(state.box.getBoundingClientRect(), {
@@ -190,7 +227,7 @@ test('saved custom dimensions fit the current viewport without leaving the title
 
 test('reset clears custom geometry, persists default mode, and survives a late settings response', async () => {
   const state = layout({
-    saved: { left: 80, top: 90, width: 600, height: 500 },
+    saved: { version: 2, left: 80, top: 90, width: 600, height: 500 },
     deferred: true,
   });
   await state.message('show-floating');
@@ -220,10 +257,13 @@ test('manual resize still saves custom dimensions after returning to default mod
   const state = layout();
   await state.message('show-floating');
   await state.message('reset-floating');
+  state.beginResize();
   Object.assign(state.box.style, { width: '640px', height: '500px' });
   state.observeResize();
   state.flush();
+  state.endResize();
   const saved = state.writes.at(-1).floatingBounds;
+  assert.equal(saved.version, 2);
   assert.equal(saved.width, 640);
   assert.equal(saved.height, 500);
 });
@@ -267,4 +307,47 @@ test('title-bar double-click restores only a floating panel and leaves toolbar b
     if (floating) assert.equal(requests[0], 'reset-floating');
     assert.equal(prevented, floating);
   }
+});
+
+test('legacy automatic rectangles cannot override the full-height default', async () => {
+  const state = layout({
+    saved: { left: 80, top: 72, width: 600, height: 700 },
+  });
+  await state.message('show-floating');
+  assert.deepEqual(state.box.getBoundingClientRect(), {
+    left: 0,
+    top: 0,
+    width: 460,
+    height: 800,
+  });
+  assert.equal(state.writes.at(-1).floatingBounds, null);
+});
+
+test('default bottom follows visual viewport changes even when layout viewport is taller', async () => {
+  const state = layout({
+    visual: { width: 1100, height: 640, offsetLeft: 0, offsetTop: 20 },
+  });
+  await state.message('show-floating');
+  let bounds = state.box.getBoundingClientRect();
+  assert.equal(bounds.top + bounds.height, 660);
+  state.resizeVisualViewport({ height: 550, offsetTop: 0 });
+  state.flush();
+  bounds = state.box.getBoundingClientRect();
+  assert.equal(bounds.top + bounds.height, 550);
+  assert.equal(state.writes.at(-1).floatingBounds, null);
+});
+
+test('automatic resize observations do not turn default mode into a frozen custom height', async () => {
+  const state = layout();
+  await state.message('show-floating');
+  const original = state.box.getBoundingClientRect.bind(state.box);
+  state.box.getBoundingClientRect = () => ({ ...original(), height: 780 });
+  state.observeResize();
+  state.flush();
+  assert.equal(state.writes.at(-1).floatingBounds, null);
+  state.box.getBoundingClientRect = original;
+  state.resizeViewport(1200, 900);
+  state.flush();
+  assert.equal(state.box.getBoundingClientRect().height, 900);
+  assert.equal(state.writes.at(-1).floatingBounds, null);
 });

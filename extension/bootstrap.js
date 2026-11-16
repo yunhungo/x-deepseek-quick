@@ -64,6 +64,7 @@
       imeConfirmation: false,
     };
     adapter.install(globalThis);
+    globalThis.__DSQUICK_PLUGIN_NOTICE__?.activate();
     // Login reuse must never prevent the independently installed visual adapter.
     try {
       globalThis.__DSQUICK_AUTH__?.activate();

@@ -3,15 +3,18 @@
  * @description 构建扩展并复用桌面应用图标及网页适配器
  * @author yunhungo
  */
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { compile } from 'sass';
 const output = new URL('../extension/dist/', import.meta.url);
 await mkdir(new URL('icons/', output), { recursive: true });
+// Remove the retired debugger module from this fixed build output.
+await rm(new URL('accessibility.js', output), { force: true });
 for (const file of [
   'manifest.json',
   'bootstrap.js',
   'worker.js',
-  'accessibility.js',
+  'page-selection.js',
+  'plugin-notice.js',
   'panel.html',
   'panel.js',
   'upload.js',

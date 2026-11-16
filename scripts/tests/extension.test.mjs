@@ -8,14 +8,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 const panelOpening = await import('../../extension/panel-opening.js');
-const accessibility = await import('../../extension/accessibility.js');
+const selection = await import('../../extension/page-selection.js');
 const authContract = await import('../../extension/auth-session.js');
 const workerSource = (
   await readFile(new URL('../../extension/worker.js', import.meta.url), 'utf8')
 )
   .replace(/^import[\s\S]*?from '\.\/auth-session\.js';\s*/m, '')
   .replace(/^import .*panel-opening.js';\s*/m, '')
-  .replace(/^import\s*\{[\s\S]*?\}\s*from '\.\/accessibility\.js';\s*/m, '');
+  .replace(/^import .*page-selection.js';\s*/m, '');
 const uploadSource = await readFile(
   new URL('../../extension/upload.js', import.meta.url),
   'utf8',
@@ -128,7 +128,7 @@ function worker(selectedText = '') {
     crypto,
     ...authContract,
     ...panelOpening,
-    ...accessibility,
+    ...selection,
   });
   const message = (body, sender) =>
     new Promise((resolve) => handlers.message(body, sender, resolve));
@@ -1260,6 +1260,19 @@ test('read-only article editor text is captured while editable drafts are exclud
   });
   assert.match(payload.text, /Published X article body/);
   assert.doesNotMatch(payload.text, /Unsent private draft/);
+  const longRoot = new Element('ARTICLE', [text('x'.repeat(220000))]);
+  const capped = vm.runInNewContext(`${functionSource}; snapshot(root)`, {
+    root: longRoot,
+    Element,
+    Node: { TEXT_NODE: 3 },
+    host: {},
+    blocked: 'input,textarea,select',
+    visible: () => true,
+    document: { title: 'Article', body: longRoot },
+    location: { href: 'https://example.com/article' },
+  });
+  assert.equal(capped.truncated, true);
+  assert.ok(capped.text.length < 181000);
 });
 
 test('existing page selection bypasses both picking and full-page capture', async () => {
@@ -1277,4 +1290,25 @@ test('existing page selection bypasses both picking and full-page capture', asyn
       false,
     );
   }
+});
+
+test('whole-page capture uses the DOM source without requesting a debugging session', async () => {
+  const context = worker();
+  const response = await context.message({ type: 'page' }, panel);
+  assert.equal(response.ok, true);
+  assert.ok(
+    context.calls.some(
+      (call) => call[0] === 'inject' && call[1].files?.includes('source.js'),
+    ),
+  );
+  assert.ok(
+    context.calls.some((call) => call[0] === 'send' && call[2].type === 'page'),
+  );
+  const manifest = JSON.parse(
+    await readFile(
+      new URL('../../extension/manifest.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  assert.equal(manifest.permissions.includes('debugger'), false);
 });
