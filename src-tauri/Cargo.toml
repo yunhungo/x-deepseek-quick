@@ -3,6 +3,7 @@ name = "deepseek-glass"
 version = "0.1.0"
 description = "Frosted launcher for the DeepSeek web chat on macOS and Linux"
 authors = ["DeepSeek Glass"]
+license = "MIT"
 edition = "2024"
 
 [lib]

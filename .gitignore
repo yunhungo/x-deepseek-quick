@@ -25,3 +25,13 @@ dist-ssr
 
 # Local task files and private configuration
 .myself/
+.codegraph/
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
