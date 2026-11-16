@@ -3,12 +3,20 @@
   "private": true,
   "version": "0.1.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yunhungo/x-deepseek-quick.git"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "test": "node --test scripts/tests/*.test.mjs",
     "test:adapter": "node --test scripts/tests/glass-policy.test.mjs",
     "package:mac": "tauri bundle --bundles app && python3 -B scripts/package-macos.py",
     "build:extension": "node scripts/build-extension.mjs"

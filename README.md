@@ -4,12 +4,12 @@
 
 ## 构建和运行
 
-需要 Node.js 20+、Rust 1.90+。macOS 需要 Xcode 命令行工具；Linux 需要 GTK 3、WebKitGTK 4.1 与相应构建工具；Windows 需要 WebView2 和 Rust/MSVC 工具链。
+需要 Node.js 20.19+（20.x）或 22.12+，Rust 工具链固定为 1.90.0。macOS 需要 Xcode 命令行工具；Linux 需要 GTK 3、WebKitGTK 4.1 与相应构建工具；Windows 需要 WebView2 和 Rust/MSVC 工具链。
 
 ```sh
 npm ci
 npm run tauri dev
-npm run test:adapter
+npm test
 npm run tauri build -- --bundles app
 ```
 
