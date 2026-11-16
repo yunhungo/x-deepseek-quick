@@ -2,6 +2,14 @@
 
 非官方 DeepSeek 网页桌面壳，支持 macOS、Linux 与 Windows。账号、聊天和上传由 DeepSeek 官网处理，应用不调用私有聊天接口。
 
+## 网页运行演示
+
+在 Chrome 的 [MDN JavaScript 文档](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)上实录：拖动悬浮面板、选择段落生成 TXT 附件，再由 DeepSeek 给出回复。
+
+https://github.com/user-attachments/assets/18e05584-a51e-4680-83d6-9675772613c5
+
+[下载演示视频（MP4，35 秒）](docs/media/dsquick-web-demo.mp4)
+
 ## 构建和运行
 
 需要 Node.js 20.19+（20.x）或 22.12+，Rust 工具链固定为 1.90.0。macOS 需要 Xcode 命令行工具；Linux 需要 GTK 3、WebKitGTK 4.1 与相应构建工具；Windows 需要 WebView2 和 Rust/MSVC 工具链。
